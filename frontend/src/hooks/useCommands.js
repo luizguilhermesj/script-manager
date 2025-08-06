@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
+import debounce from 'lodash/debounce';
 import socket, { getCommands, createCommand as apiCreateCommand, updateCommand as apiUpdateCommand, deleteCommand as apiDeleteCommand, runCommand as apiRunCommand, stopCommand as apiStopCommand } from '../api';
 import { createNewCommand } from '../utils';
 
@@ -7,11 +8,21 @@ export const useCommands = () => {
     const [commands, setCommands] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Create a ref to hold the most current version of the commands state.
     const commandsRef = useRef(commands);
     useEffect(() => {
         commandsRef.current = commands;
     }, [commands]);
+
+    const debouncedApiUpdate = useRef(
+        debounce((command) => {
+            apiUpdateCommand(command).catch((error) => {
+                toast.error(`Failed to save: ${error.message}`);
+                setCommands(prev => prev.map(c => 
+                    c.id === command.id ? { ...c, savingStatus: 'error' } : c
+                ));
+            });
+        }, 500)
+    ).current;
 
     useEffect(() => {
         const fetchInitialCommands = async () => {
@@ -20,7 +31,8 @@ export const useCommands = () => {
                 setCommands(initialCommands.map(cmd => ({
                     ...cmd,
                     output: cmd.output || [],
-                    errorOutput: cmd.errorOutput || []
+                    errorOutput: cmd.errorOutput || [],
+                    savingStatus: 'success', // Default to success ('Saved')
                 })));
             } catch (error) {
                 toast.error("Failed to fetch commands.");
@@ -31,14 +43,17 @@ export const useCommands = () => {
         fetchInitialCommands();
 
         const handleStatusUpdate = (data) => {
-            setCommands(prev => prev.map(cmd => cmd.id === data.id ? data : cmd));
+            setCommands(prev => prev.map(cmd => {
+                if (cmd.id !== data.id) return cmd;
+                if (data.name) return { ...cmd, ...data };
+                return { ...cmd, status: data.status, returnCode: data.returnCode };
+            }));
         };
 
         const handleStdout = (data) => {
             setCommands(prev => prev.map(cmd => {
                 if (cmd.id === data.command_id) {
-                    const newOutput = [...(cmd.output || []), data.output];
-                    return { ...cmd, output: newOutput };
+                    return { ...cmd, output: [...(cmd.output || []), data.output] };
                 }
                 return cmd;
             }));
@@ -47,15 +62,14 @@ export const useCommands = () => {
         const handleStderr = (data) => {
             setCommands(prev => prev.map(cmd => {
                 if (cmd.id === data.command_id) {
-                    const newErrorOutput = [...(cmd.errorOutput || []), data.output];
-                    return { ...cmd, errorOutput: newErrorOutput };
+                    return { ...cmd, errorOutput: [...(cmd.errorOutput || []), data.output] };
                 }
                 return cmd;
             }));
         };
         
         const handleCommandAdded = (command) => {
-            setCommands(prev => [...prev, { ...command, output: [], errorOutput: [] }]);
+            setCommands(prev => [...prev, { ...command, output: [], errorOutput: [], savingStatus: 'success' }]);
             toast.success(`Command "${command.name}" added.`);
         };
 
@@ -65,8 +79,12 @@ export const useCommands = () => {
         };
         
         const handleCommandUpdated = (command) => {
-            setCommands(prev => prev.map(cmd => cmd.id === command.id ? { ...cmd, ...command } : cmd));
-            toast.success(`Command "${command.name}" updated.`);
+            setCommands(prev => prev.map(cmd => {
+                if (cmd.id === command.id) {
+                    return { ...cmd, ...command, savingStatus: 'success' };
+                }
+                return cmd;
+            }));
         };
 
         socket.on('status_update', handleStatusUpdate);
@@ -84,25 +102,30 @@ export const useCommands = () => {
             socket.off('command_deleted', handleCommandDeleted);
             socket.off('command_updated', handleCommandUpdated);
         };
-    }, []);
+    }, [debouncedApiUpdate]);
 
     const addCommand = () => {
         apiCreateCommand(createNewCommand());
     };
 
-    const updateCommand = (id, updates) => {
-        const commandToUpdate = commands.find(c => c.id === id);
-        if (!commandToUpdate) return;
-
-        const updatedCommand = { ...commandToUpdate, ...updates };
-        
-        apiUpdateCommand(updatedCommand).catch((error) => {
-            toast.error(`Failed to update command: ${error.message}`);
+    const updateCommand = useCallback((id, updates) => {
+        let updatedCommand;
+        setCommands(prev => {
+            return prev.map(cmd => {
+                if (cmd.id === id) {
+                    updatedCommand = { ...cmd, ...updates, savingStatus: 'saving' };
+                    return updatedCommand;
+                }
+                return cmd;
+            });
         });
-    };
+
+        if (updatedCommand) {
+            debouncedApiUpdate(updatedCommand);
+        }
+    }, [debouncedApiUpdate]);
 
     const runChain = async (commandId) => {
-        // Use the ref to get the most up-to-date command list.
         const commandMap = new Map(commandsRef.current.map(c => [c.id, c]));
         const chain = [];
         const visited = new Set();
@@ -110,7 +133,6 @@ export const useCommands = () => {
         function getDependencies(cmdId) {
             if (visited.has(cmdId)) return;
             visited.add(cmdId);
-
             const command = commandMap.get(cmdId);
             if (command) {
                 command.arguments
@@ -123,7 +145,6 @@ export const useCommands = () => {
         getDependencies(commandId);
 
         for (const command of chain) {
-            // Use the ref to get the true current state of the command before running.
             const currentCommandState = commandsRef.current.find(c => c.id === command.id);
             if (currentCommandState.status === 'success') continue;
             
@@ -142,10 +163,8 @@ export const useCommands = () => {
                     };
                     socket.on('status_update', onStatusUpdate);
                 });
-
                 await apiRunCommand(command.id);
                 await commandFinishedPromise;
-
             } catch (error) {
                 toast.error(error.message);
                 return; 

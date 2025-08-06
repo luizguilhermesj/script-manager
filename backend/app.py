@@ -86,20 +86,25 @@ def process_monitor_thread(command_id, proc):
         if command_row:
             command_def = json.loads(command_row['data'])
             
+            final_status = 'error'
             if proc.returncode == 0:
-                command_def['status'] = 'success'
+                final_status = 'success'
             elif proc.returncode < 0:
-                command_def['status'] = 'stopped'
-            else:
-                command_def['status'] = 'error'
+                final_status = 'stopped'
             
+            # Update the full definition for the database for persistence
+            command_def['status'] = final_status
             command_def['returnCode'] = proc.returncode
-            # Ensure final output is included
             command_def['output'] = command_def.get('output', []) + stdout_lines
             command_def['errorOutput'] = command_def.get('errorOutput', []) + stderr_lines
-            
             execute_db('UPDATE commands SET data = ? WHERE id = ?', [json.dumps(command_def), command_id])
-            socketio.emit('status_update', command_def)
+            
+            # Emit a smaller, status-only update to the frontend
+            socketio.emit('status_update', {
+                'id': command_id,
+                'status': final_status,
+                'returnCode': proc.returncode
+            })
             
     if command_id in processes:
         del processes[command_id]
@@ -233,6 +238,16 @@ def run_command(command_id):
         execute_db('UPDATE commands SET data = ? WHERE id = ?', [json.dumps(command_def), command_id])
         socketio.emit('status_update', command_def)
         return jsonify({'error': str(e)}), 500
+
+@app.route('/commands/<command_id>/arguments/<argument_name>/history', methods=['GET'])
+def get_argument_history(command_id, argument_name):
+    """Retrieves the last 10 unique values for a given argument of a command."""
+    history_rows = query_db(
+        'SELECT DISTINCT value FROM argument_history WHERE command_id = ? AND argument_name = ? ORDER BY id DESC LIMIT 10',
+        [command_id, argument_name]
+    )
+    history = [row['value'] for row in history_rows]
+    return jsonify(history)
 
 @app.route('/commands/<command_id>/stop', methods=['POST'])
 def stop_command(command_id):

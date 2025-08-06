@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ArgumentEditor from './ArgumentEditor';
-import { PlusIcon, TrashIcon, PlayIcon, StopIcon, ChevronUpIcon, ChevronDownIcon } from './Icons';
+import { PlusIcon, TrashIcon, PlayIcon, StopIcon, ChevronUpIcon, ChevronDownIcon, SavingIcon, SavedIcon, ErrorIcon } from './Icons';
 import { createNewArgument } from '../utils';
 
 const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCommand, runChain, commands }) => {
@@ -10,55 +10,49 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
         return command.arguments
             .filter(arg => arg.enabled && arg.type === 'variable' && arg.sourceCommandId)
             .map(arg => commands.find(c => c.id === arg.sourceCommandId))
-            .filter(Boolean); // Filter out any undefined commands
+            .filter(Boolean);
     }, [command.arguments, commands]);
 
     const areDependenciesMet = useMemo(() => {
         return dependencies.every(dep => dep.status === 'success');
     }, [dependencies]);
 
-    useEffect(() => {
-        const generateDisplayCommand = () => {
-            const generatedArgs = command.arguments
-                .filter(arg => arg.enabled)
-                .map(arg => {
-                    let value = arg.value;
-                    if (arg.type === 'variable') {
-                        const sourceCommand = commands.find(c => c.id === arg.sourceCommandId);
-                        if (!sourceCommand) {
-                            value = '<invalid source>';
-                        } else if (sourceCommand.status !== 'success') {
-                            value = `<run '${sourceCommand.name}'>`;
-                        } else if (!arg.regex) {
-                            value = '<add regex>';
-                        } else {
-                            try {
-                                const regex = new RegExp(arg.regex);
-                                const fullOutput = sourceCommand.output.join('\n');
-                                const match = fullOutput.match(regex);
-                                value = (match && match[1]) ? match[1] : '<no match>';
-                            } catch (e) {
-                                value = '<invalid regex>';
-                            }
+    // Calculate generated command for display purposes only.
+    // The backend is the source of truth for execution.
+    const displayCommand = useMemo(() => {
+        const generatedArgs = command.arguments
+            .filter(arg => arg.enabled)
+            .map(arg => {
+                let value = arg.value;
+                if (arg.type === 'variable') {
+                    const sourceCommand = commands.find(c => c.id === arg.sourceCommandId);
+                    if (!sourceCommand) {
+                        value = '<invalid source>';
+                    } else if (sourceCommand.status !== 'success') {
+                        value = `<run '${sourceCommand.name}'>`;
+                    } else if (!arg.regex) {
+                        value = '<add regex>';
+                    } else {
+                        try {
+                            const regex = new RegExp(arg.regex);
+                            const fullOutput = sourceCommand.output.join('\n');
+                            const match = fullOutput.match(regex);
+                            value = (match && match[1]) ? match[1] : '<no match>';
+                        } catch (e) {
+                            value = '<invalid regex>';
                         }
                     }
+                }
 
-                    if (arg.isPositional) {
-                        return value || '';
-                    } else {
-                        return value ? `${arg.name} ${value}` : arg.name;
-                    }
-                });
+                if (arg.isPositional) {
+                    return value || '';
+                } else {
+                    return value ? `${arg.name} ${value}` : arg.name;
+                }
+            });
 
-            const fullGeneratedCommand = `${command.executable} ${generatedArgs.filter(Boolean).join(' ')}`;
-
-            if (fullGeneratedCommand !== command.generatedCommand) {
-                updateCommand(command.id, { generatedCommand: fullGeneratedCommand });
-            }
-        };
-
-        generateDisplayCommand();
-    }, [command.arguments, command.executable, commands, command.id, command.generatedCommand]);
+        return `${command.executable} ${generatedArgs.filter(Boolean).join(' ')}`;
+    }, [command.arguments, command.executable, commands]);
 
 
     const updateArgument = (argId, updates) => {
@@ -121,7 +115,6 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
     const [activeTab, setActiveTab] = useState('stdout');
 
     useEffect(() => {
-        // If there's an error, switch to the error tab automatically
         if (command.errorOutput && command.errorOutput.length > 0) {
             setActiveTab('stderr');
         }
@@ -132,6 +125,34 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
     const handleDelete = () => {
         if (window.confirm(`Are you sure you want to delete the command "${command.name}"?`)) {
             deleteCommand(command.id);
+        }
+    };
+
+    const SaveStatus = () => {
+        switch (command.savingStatus) {
+            case 'saving':
+                return (
+                    <div className="flex items-center gap-2 text-gray-400 text-sm">
+                        <SavingIcon />
+                        <span>Saving...</span>
+                    </div>
+                );
+            case 'success':
+                return (
+                    <div className="flex items-center gap-2 text-green-400 text-sm">
+                        <SavedIcon />
+                        <span>Saved</span>
+                    </div>
+                );
+            case 'error':
+                return (
+                    <div className="flex items-center gap-2 text-red-500 text-sm">
+                        <ErrorIcon />
+                        <span>Error</span>
+                    </div>
+                );
+            default:
+                return null;
         }
     };
 
@@ -151,7 +172,8 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
                         className="text-xl font-bold bg-transparent focus:bg-gray-700 rounded-md px-2 py-1 -ml-2"
                     />
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                    <SaveStatus />
                     <button onClick={handleDelete} className="text-gray-500 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-gray-700">
                         <TrashIcon />
                     </button>
@@ -203,10 +225,10 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
                             <div className="md:col-span-2 relative">
                                 <label className="text-sm font-semibold text-gray-400">Generated Command</label>
                                 <div className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 mt-1 font-mono text-sm text-green-400 overflow-x-auto whitespace-pre">
-                                    {command.generatedCommand || <span className="text-gray-500">Press 'Run' to generate...</span>}
+                                    {displayCommand || <span className="text-gray-500">Press 'Run' to generate...</span>}
                                 </div>
                                 <button
-                                    onClick={() => navigator.clipboard.writeText(command.generatedCommand)}
+                                    onClick={() => navigator.clipboard.writeText(displayCommand)}
                                     className="absolute top-6 right-2 text-gray-400 hover:text-white"
                                     title="Copy to clipboard"
                                 >
@@ -257,7 +279,7 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
                                             </span>
                                         )}
                                         <button
-                                            onClick={() => updateCommand(command.id, { output: [], errorOutput: [] })}
+                                            onClick={() => updateCommand(command.id, { output: [], errorOutput: [], status: 'idle', returnCode: null })}
                                             className="text-gray-400 hover:text-white text-xs"
                                             title="Clear output"
                                         >
