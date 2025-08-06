@@ -18,8 +18,12 @@ function App() {
             }} />
             <div className="container mx-auto p-4 md:p-8">
                 <header className="mb-8">
-                    <h1 className="text-4xl font-bold text-indigo-400">Jules</h1>
-                    <p className="text-gray-400">A simple command runner UI.</p>
+                    <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl">
+                        Command Chain <span className="text-indigo-400">Dashboard</span>
+                    </h1>
+                    <p className="mt-3 text-lg text-gray-400">
+                        Visually manage, run, and chain your command-line scripts.
+                    </p>
                 </header>
 
                 <div className="space-y-6">

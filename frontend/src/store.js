@@ -1,16 +1,16 @@
 import { create } from 'zustand';
 import { toast } from 'react-hot-toast';
 import debounce from 'lodash/debounce';
-import socket, { getCommands, createCommand as apiCreateCommand, updateCommand as apiUpdateCommand, deleteCommand as apiDeleteCommand, runCommand as apiRunCommand, stopCommand as apiStopCommand } from './api';
+import socket, { getCommands, updateCommand as apiUpdateCommand, runCommand as apiRunCommand, stopCommand as apiStopCommand } from './api';
 import { createNewCommand } from './utils';
 
 const useCommandStore = create((set, get) => ({
     commands: [],
     loading: true,
+    isInitialized: false,
 
     // --- Actions ---
 
-    // Debounced API call for updates
     debouncedApiUpdate: debounce((command) => {
         apiUpdateCommand(command).catch((error) => {
             toast.error(`Failed to save: ${error.message}`);
@@ -22,7 +22,6 @@ const useCommandStore = create((set, get) => ({
         });
     }, 500),
 
-    // Fetches initial commands from the backend
     fetchInitialCommands: async () => {
         try {
             const initialCommands = await getCommands();
@@ -31,7 +30,7 @@ const useCommandStore = create((set, get) => ({
                     ...cmd,
                     output: cmd.output || [],
                     errorOutput: cmd.errorOutput || [],
-                    savingStatus: 'success', // Default to 'Saved'
+                    savingStatus: 'success',
                 })),
                 loading: false
             });
@@ -41,12 +40,14 @@ const useCommandStore = create((set, get) => ({
         }
     },
 
-    // Adds a new command
     addCommand: () => {
-        apiCreateCommand(createNewCommand());
+        socket.emit('create_command', createNewCommand());
     },
 
-    // Updates a command locally and triggers a debounced save
+    deleteCommand: (commandId) => {
+        socket.emit('delete_command', { id: commandId });
+    },
+
     updateCommand: (id, updates) => {
         let updatedCommand;
         set(state => ({
@@ -64,16 +65,6 @@ const useCommandStore = create((set, get) => ({
         }
     },
 
-    // Deletes a command
-    deleteCommand: async (commandId) => {
-        try {
-            await apiDeleteCommand(commandId);
-        } catch (error) {
-            toast.error(`Failed to delete command: ${error.message}`);
-        }
-    },
-
-    // Runs a single command
     runCommand: async (commandId) => {
         try {
             await apiRunCommand(commandId);
@@ -82,7 +73,6 @@ const useCommandStore = create((set, get) => ({
         }
     },
 
-    // Stops a running command
     stopCommand: async (commandId) => {
         try {
             await apiStopCommand(commandId);
@@ -92,7 +82,6 @@ const useCommandStore = create((set, get) => ({
         }
     },
 
-    // Runs a command and its dependency chain
     runChain: async (commandId) => {
         const commandMap = new Map(get().commands.map(c => [c.id, c]));
         const chain = [];
@@ -141,76 +130,72 @@ const useCommandStore = create((set, get) => ({
     },
 
     // --- Socket.IO Event Handlers ---
-    
-    handleCommandAdded: (command) => {
-        set(state => ({
-            commands: [...state.commands, { ...command, output: [], errorOutput: [], savingStatus: 'success' }]
-        }));
-        toast.success(`Command "${command.name}" added.`);
-    },
+    initSocketListeners: () => {
+        if (get().isInitialized) return;
 
-    handleCommandDeleted: (data) => {
-        set(state => ({
-            commands: state.commands.filter(cmd => cmd.id !== data.command_id)
-        }));
-        toast.success(`Command deleted.`);
-    },
+        socket.on('command_added', (command) => {
+            set(state => ({
+                commands: [...state.commands, { ...command, output: [], errorOutput: [], savingStatus: 'success' }]
+            }));
+            toast.success(`Command "${command.name}" added.`);
+        });
 
-    handleCommandUpdated: (command) => {
-        set(state => ({
-            commands: state.commands.map(cmd => {
-                if (cmd.id === command.id) {
-                    return { ...cmd, ...command, savingStatus: 'success' };
-                }
-                return cmd;
-            })
-        }));
-    },
+        socket.on('command_deleted', (data) => {
+            set(state => ({
+                commands: state.commands.filter(cmd => cmd.id !== data.command_id)
+            }));
+            toast.success(`Command deleted.`);
+        });
 
-    handleStatusUpdate: (data) => {
-        set(state => ({
-            commands: state.commands.map(cmd => {
-                if (cmd.id !== data.id) return cmd;
-                // Full update from 'run' command
-                if (data.name) return { ...cmd, ...data };
-                // Final status-only update, mark as saved
-                return { ...cmd, status: data.status, returnCode: data.returnCode, savingStatus: 'success' };
-            })
-        }));
-    },
+        socket.on('command_updated', (command) => {
+            set(state => ({
+                commands: state.commands.map(cmd => {
+                    if (cmd.id === command.id) {
+                        return { ...cmd, ...command, savingStatus: 'success' };
+                    }
+                    return cmd;
+                })
+            }));
+        });
 
-    handleStdout: (data) => {
-        set(state => ({
-            commands: state.commands.map(cmd => {
-                if (cmd.id === data.command_id) {
-                    return { ...cmd, output: [...(cmd.output || []), data.output] };
-                }
-                return cmd;
-            })
-        }));
-    },
+        socket.on('status_update', (data) => {
+            set(state => ({
+                commands: state.commands.map(cmd => {
+                    if (cmd.id !== data.id) return cmd;
+                    if (data.name) return { ...cmd, ...data };
+                    return { ...cmd, status: data.status, returnCode: data.returnCode, savingStatus: 'success' };
+                })
+            }));
+        });
 
-    handleStderr: (data) => {
-        set(state => ({
-            commands: state.commands.map(cmd => {
-                if (cmd.id === data.command_id) {
-                    return { ...cmd, errorOutput: [...(cmd.errorOutput || []), data.output] };
-                }
-                return cmd;
-            })
-        }));
+        socket.on('stdout', (data) => {
+            set(state => ({
+                commands: state.commands.map(cmd => {
+                    if (cmd.id === data.command_id) {
+                        return { ...cmd, output: [...(cmd.output || []), data.output] };
+                    }
+                    return cmd;
+                })
+            }));
+        });
+
+        socket.on('stderr', (data) => {
+            set(state => ({
+                commands: state.commands.map(cmd => {
+                    if (cmd.id === data.command_id) {
+                        return { ...cmd, errorOutput: [...(cmd.errorOutput || []), data.output] };
+                    }
+                    return cmd;
+                })
+            }));
+        });
+
+        set({ isInitialized: true });
     },
 }));
 
-// --- Initialize Socket.IO listeners ---
-socket.on('command_added', useCommandStore.getState().handleCommandAdded);
-socket.on('command_deleted', useCommandStore.getState().handleCommandDeleted);
-socket.on('command_updated', useCommandStore.getState().handleCommandUpdated);
-socket.on('status_update', useCommandStore.getState().handleStatusUpdate);
-socket.on('stdout', useCommandStore.getState().handleStdout);
-socket.on('stderr', useCommandStore.getState().handleStderr);
-
-// --- Fetch initial data ---
+// Initialize after creation
+useCommandStore.getState().initSocketListeners();
 useCommandStore.getState().fetchInitialCommands();
 
 export default useCommandStore;

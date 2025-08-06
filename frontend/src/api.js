@@ -8,7 +8,6 @@ const handleResponse = async (response) => {
         const errorData = await response.json().catch(() => ({ error: 'An unknown API error occurred' }));
         throw new Error(errorData.error || `Request failed with status ${response.status}`);
     }
-    // Return response JSON only if there is content
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {
         return response.json();
@@ -24,27 +23,11 @@ export const getCommands = async () => {
     return response.json();
 };
 
-export const createCommand = async (command) => {
-    const response = await fetch(`${API_URL}/commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(command),
-    });
-    return handleResponse(response);
-};
-
 export const updateCommand = async (command) => {
     const response = await fetch(`${API_URL}/commands/${command.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(command),
-    });
-    return handleResponse(response);
-};
-
-export const deleteCommand = async (commandId) => {
-    const response = await fetch(`${API_URL}/commands/${commandId}`, {
-        method: 'DELETE',
     });
     return handleResponse(response);
 };

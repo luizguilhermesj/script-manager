@@ -52,6 +52,23 @@ def execute_db(query, args=()):
 # --- In-memory data store for runtime processes ---
 processes = {}
 
+@socketio.on('create_command')
+def handle_create_command(data):
+    command_id = data.get('id', str(len(query_db('SELECT * FROM commands')) + 1))
+    data['id'] = command_id
+    execute_db('INSERT INTO commands (id, data) VALUES (?, ?)', [command_id, json.dumps(data)])
+    socketio.emit('command_added', data)
+
+@socketio.on('delete_command')
+def handle_delete_command(data):
+    command_id = data.get('id')
+    if command_id:
+        execute_db('DELETE FROM commands WHERE id = ?', [command_id])
+        execute_db('DELETE FROM argument_history WHERE command_id = ?', [command_id])
+        if command_id in processes:
+            del processes[command_id]
+        socketio.emit('command_deleted', {'command_id': command_id})
+
 def process_monitor_thread(command_id, proc):
     """Monitors a command, streams its output, and handles termination using gevent."""
     stdout_lines = []
@@ -108,15 +125,6 @@ def process_monitor_thread(command_id, proc):
             
     if command_id in processes:
         del processes[command_id]
-
-@app.route('/commands', methods=['POST'])
-def create_command():
-    data = request.get_json()
-    command_id = data.get('id', str(len(query_db('SELECT * FROM commands')) + 1))
-    data['id'] = command_id
-    execute_db('INSERT INTO commands (id, data) VALUES (?, ?)', [command_id, json.dumps(data)])
-    socketio.emit('command_added', data)
-    return jsonify(data), 201
 
 @app.route('/commands', methods=['GET'])
 def get_commands():
@@ -221,11 +229,22 @@ def run_command(command_id):
     socketio.emit('status_update', command_def)
 
     try:
+        # Check if the working directory exists
+        working_dir = command_def.get('workingDirectory')
+        if working_dir and not os.path.isdir(working_dir):
+            error_msg = f"Working directory not found: {working_dir}"
+            command_def['status'] = 'error'
+            command_def['errorOutput'] = [error_msg]
+            execute_db('UPDATE commands SET data = ? WHERE id = ?', [json.dumps(command_def), command_id])
+            socketio.emit('status_update', command_def)
+            return jsonify({'error': error_msg}), 400
+
         # Use gevent's Popen for non-blocking subprocess management
         proc = subprocess.Popen(
             command_to_run, shell=True, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, preexec_fn=os.setsid,
-            bufsize=1, universal_newlines=True
+            bufsize=1, universal_newlines=True,
+            cwd=working_dir or None # Use None if directory is empty string
         )
         processes[command_id] = proc
         
@@ -262,15 +281,6 @@ def stop_command(command_id):
         pass # Process already terminated
     
     return jsonify({'message': 'Stop signal sent'})
-
-@app.route('/commands/<command_id>', methods=['DELETE'])
-def delete_command(command_id):
-    execute_db('DELETE FROM commands WHERE id = ?', [command_id])
-    execute_db('DELETE FROM argument_history WHERE command_id = ?', [command_id])
-    if command_id in processes:
-        del processes[command_id]
-    socketio.emit('command_deleted', {'command_id': command_id})
-    return jsonify({'message': 'Command deleted'}), 200
 
 @app.route('/commands/<command_id>', methods=['PUT'])
 def update_command(command_id):

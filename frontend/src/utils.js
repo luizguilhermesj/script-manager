@@ -12,10 +12,11 @@ export const createNewArgument = () => ({
 export const createNewCommand = () => ({
     id: `cmd-${Date.now()}-${Math.random()}`,
     name: 'New Command',
-    executable: 'python',
-    status: 'idle', // 'idle', 'running', 'success', 'error', 'stopped'
+    executable: '',
+    workingDirectory: '',
+    arguments: [],
+    status: 'idle', // idle, running, success, error, stopped
     output: [],
     errorOutput: [],
-    generatedCommand: 'python --new-arg ',
-    arguments: [createNewArgument()],
+    generatedCommand: '',
 });

@@ -81,7 +81,7 @@ const CommandCard = ({ command }) => {
 
     const statusText = {
         idle: 'Idle',
-        running: 'Running...', 
+        running: 'Running...',
         success: 'Success',
         error: 'Error',
         stopped: 'Stopped',
@@ -211,7 +211,7 @@ const CommandCard = ({ command }) => {
                 <div>
                     <div className="p-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <div>
+                            <div className="md:col-span-1">
                                 <label className="text-sm font-semibold text-gray-400">Executable</label>
                                 <input
                                     type="text"
@@ -221,7 +221,17 @@ const CommandCard = ({ command }) => {
                                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-1 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
                             </div>
-                            <div className="md:col-span-2 relative">
+                            <div className="md:col-span-2">
+                                <label className="text-sm font-semibold text-gray-400">Working Directory</label>
+                                <input
+                                    type="text"
+                                    value={command.workingDirectory || ''}
+                                    onChange={(e) => updateCommand(command.id, { workingDirectory: e.target.value })}
+                                    placeholder="e.g., /home/username"
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                />
+                            </div>
+                            <div className="md:col-span-3 relative">
                                 <label className="text-sm font-semibold text-gray-400">Generated Command</label>
                                 <div className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 mt-1 font-mono text-sm text-green-400 overflow-x-auto whitespace-pre">
                                     {displayCommand || <span className="text-gray-500">Press 'Run' to generate...</span>}
@@ -283,7 +293,7 @@ const CommandCard = ({ command }) => {
                                         </button>
                                     </div>
                                 </div>
-                                
+
                                 <div className="border-b border-gray-600 mb-2">
                                     <div className="flex -mb-px">
                                         <button
