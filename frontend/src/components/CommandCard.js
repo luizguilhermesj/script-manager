@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ArgumentEditor from './ArgumentEditor';
 import { PlusIcon, TrashIcon, PlayIcon, StopIcon, ChevronUpIcon, ChevronDownIcon, SavingIcon, SavedIcon, ErrorIcon } from './Icons';
 import { createNewArgument } from '../utils';
+import useCommandStore from '../store';
 
-const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCommand, runChain, commands }) => {
+const CommandCard = ({ command }) => {
+    const { commands, updateCommand, deleteCommand, runCommand, stopCommand, runChain } = useCommandStore();
     const [isOutputVisible, setIsOutputVisible] = useState(true);
 
     const dependencies = useMemo(() => {
@@ -17,8 +19,6 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
         return dependencies.every(dep => dep.status === 'success');
     }, [dependencies]);
 
-    // Calculate generated command for display purposes only.
-    // The backend is the source of truth for execution.
     const displayCommand = useMemo(() => {
         const generatedArgs = command.arguments
             .filter(arg => arg.enabled)
@@ -54,7 +54,6 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
         return `${command.executable} ${generatedArgs.filter(Boolean).join(' ')}`;
     }, [command.arguments, command.executable, commands]);
 
-
     const updateArgument = (argId, updates) => {
         const newArgs = command.arguments.map(arg =>
             arg.id === argId ? { ...arg, ...updates } : arg
@@ -82,7 +81,7 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
 
     const statusText = {
         idle: 'Idle',
-        running: 'Running...',
+        running: 'Running...', 
         success: 'Success',
         error: 'Error',
         stopped: 'Stopped',
@@ -245,9 +244,6 @@ const CommandCard = ({ command, updateCommand, deleteCommand, runCommand, stopCo
                                 <ArgumentEditor
                                     key={arg.id}
                                     argument={arg}
-                                    updateArgument={updateArgument}
-                                    deleteArgument={deleteArgument}
-                                    commands={commands}
                                     commandId={command.id}
                                 />
                             ))}

@@ -1,13 +1,36 @@
 import React, { useState, useEffect } from 'react';
+import useCommandStore from '../store';
 import { ChevronUpIcon, ChevronDownIcon, TrashIcon, LinkIcon } from './Icons';
 
 const API_URL = 'http://127.0.0.1:5000';
 
-const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, commandId }) => {
+const ArgumentEditor = ({ argument, commandId }) => {
+    const { commands, updateCommand } = useCommandStore();
     const [isExpanded, setIsExpanded] = useState(true);
     const [localName, setLocalName] = useState(argument.name);
     const [localValue, setLocalValue] = useState(argument.value);
     const [history, setHistory] = useState([]);
+
+    // This is the function that was missing from the parent.
+    // It's now defined locally and uses the updateCommand from the store.
+    const handleUpdateArgument = (updates) => {
+        // We need to find the full command from the store to update it
+        const command = commands.find(c => c.id === commandId);
+        if (!command) return;
+
+        const newArgs = command.arguments.map(arg =>
+            arg.id === argument.id ? { ...arg, ...updates } : arg
+        );
+        updateCommand(commandId, { arguments: newArgs });
+    };
+
+    const handleDeleteArgument = () => {
+        const command = commands.find(c => c.id === commandId);
+        if (!command) return;
+
+        const newArgs = command.arguments.filter(arg => arg.id !== argument.id);
+        updateCommand(commandId, { arguments: newArgs });
+    };
 
     useEffect(() => {
         setLocalName(argument.name);
@@ -38,7 +61,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
     };
 
     const handleBlur = (field, value) => {
-        updateArgument(argument.id, { [field]: value });
+        handleUpdateArgument({ [field]: value });
     };
 
     const handleTypeChange = (e) => {
@@ -47,7 +70,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
         if (newType === 'variable') {
             updates.value = ''; // Reset value when switching to variable
         }
-        updateArgument(argument.id, updates);
+        handleUpdateArgument(updates);
     };
 
     const renderValueInput = () => {
@@ -104,7 +127,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
                         <input
                             type="checkbox"
                             checked={argument.enabled}
-                            onChange={(e) => updateArgument(argument.id, { enabled: e.target.checked })}
+                            onChange={(e) => handleUpdateArgument({ enabled: e.target.checked })}
                             className="form-checkbox h-4 w-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
                         />
                         Active
@@ -113,7 +136,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
                         <input
                             type="checkbox"
                             checked={argument.isPositional || false}
-                            onChange={(e) => updateArgument(argument.id, { isPositional: e.target.checked })}
+                            onChange={(e) => handleUpdateArgument({ isPositional: e.target.checked })}
                             className="form-checkbox h-4 w-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
                         />
                         Positional
@@ -121,7 +144,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
                     <button onClick={() => setIsExpanded(!isExpanded)} className="text-gray-400 hover:text-white">
                         {isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                     </button>
-                    <button onClick={() => deleteArgument(argument.id)} className="text-red-500 hover:text-red-400">
+                    <button onClick={handleDeleteArgument} className="text-red-500 hover:text-red-400">
                         <TrashIcon />
                     </button>
                 </div>
@@ -159,7 +182,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
                                     <label className="text-xs font-semibold text-gray-400">Source Command</label>
                                     <select
                                         value={argument.sourceCommandId || ''}
-                                        onChange={(e) => updateArgument(argument.id, { sourceCommandId: e.target.value })}
+                                        onChange={(e) => handleUpdateArgument({ sourceCommandId: e.target.value })}
                                         className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
                                     >
                                         <option value="">Select a command...</option>
@@ -174,7 +197,7 @@ const ArgumentEditor = ({ argument, updateArgument, deleteArgument, commands, co
                                         type="text"
                                         placeholder="e.g., token: (\w+)"
                                         value={argument.regex}
-                                        onChange={(e) => updateArgument(argument.id, { regex: e.target.value })}
+                                        onChange={(e) => handleUpdateArgument({ regex: e.target.value })}
                                         className="w-full font-mono bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
                                     />
                                 </div>
