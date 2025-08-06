@@ -20,10 +20,10 @@
     <h2 class="text-xl font-semibold mb-2">Existing Commands</h2>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {#each data.commands as command}
-        <div class="border rounded p-4">
+        <a href="/commands/{command.id}" class="border rounded p-4 block hover:bg-gray-50">
           <h3 class="font-bold text-lg">{command.name}</h3>
           <p class="font-mono bg-gray-100 p-2 rounded mt-2">{command.command}</p>
-        </div>
+        </a>
       {/each}
     </div>
   </div>

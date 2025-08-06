@@ -4,7 +4,11 @@ import { commands } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
 export async function GET() {
-  const allCommands = await db.select().from(commands);
+  const allCommands = await db.query.commands.findMany({
+    with: {
+      args: true,
+    },
+  });
   return json(allCommands);
 }
 

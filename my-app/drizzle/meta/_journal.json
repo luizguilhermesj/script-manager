@@ -8,6 +8,13 @@
       "when": 1754435646212,
       "tag": "0000_conscious_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1754437385870,
+      "tag": "0001_conscious_reaper",
+      "breakpoints": true
     }
   ]
 }
