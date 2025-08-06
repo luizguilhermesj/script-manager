@@ -1,119 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
-
-const API_URL = 'http://127.0.0.1:5000';
+import React from 'react';
+import CommandCard from './components/CommandCard';
+import { PlusIcon } from './components/Icons';
+import { useCommands } from './hooks/useCommands';
+import { Toaster, toast } from 'react-hot-toast';
 
 function App() {
-  const [commands, setCommands] = useState([]);
-  const [newCommand, setNewCommand] = useState('');
+    const { commands, loading, addCommand, updateCommand, deleteCommand, runCommand, stopCommand, runChain } = useCommands();
 
-  const fetchCommands = async () => {
-    try {
-      const response = await fetch(`${API_URL}/commands`);
-      const data = await response.json();
-      setCommands(data);
-    } catch (error) {
-      console.error('Error fetching commands:', error);
-    }
-  };
+    return (
+        <div className="bg-gray-900 text-white min-h-screen font-sans">
+            <Toaster position="bottom-right" />
+            <div className="container mx-auto p-4 md:p-8">
+                <header className="mb-8">
+                    <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl">
+                        Command Chain <span className="text-indigo-400">Dashboard</span>
+                    </h1>
+                    <p className="mt-3 text-lg text-gray-400">
+                        Visually manage, run, and chain your command-line scripts.
+                    </p>
+                </header>
 
-  useEffect(() => {
-    fetchCommands();
-    const interval = setInterval(fetchCommands, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, []);
+                <main>
+                    {loading ? (
+                        <div className="text-center">
+                            <p className="text-lg text-gray-400">Loading commands...</p>
+                        </div>
+                    ) : (
+                        commands.map(cmd => (
+                            <CommandCard
+                                key={cmd.id}
+                                command={cmd}
+                                updateCommand={updateCommand}
+                                deleteCommand={() => deleteCommand(cmd.id).catch(() => toast.error("Failed to delete command."))}
+                                runCommand={() => runCommand(cmd.id).catch(() => toast.error("Failed to run command."))}
+                                stopCommand={() => stopCommand(cmd.id).catch(() => toast.error("Failed to stop command."))}
+                                runChain={runChain}
+                                commands={commands}
+                            />
+                        ))
+                    )}
 
-  const handleCreateCommand = async (e) => {
-    e.preventDefault();
-    if (!newCommand) return;
-    try {
-      await fetch(`${API_URL}/commands`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: newCommand }),
-      });
-      setNewCommand('');
-      fetchCommands();
-    } catch (error) {
-      console.error('Error creating command:', error);
-    }
-  };
+                    {!loading && (
+                        <div className="mt-8 text-center">
+                            <button
+                                onClick={addCommand}
+                                className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg transition-colors inline-flex items-center gap-2"
+                            >
+                                <PlusIcon />
+                                Add New Command
+                            </button>
+                        </div>
+                    )}
+                </main>
 
-  const handleRunCommand = async (commandId) => {
-    try {
-      await fetch(`${API_URL}/commands/${commandId}/run`, { method: 'POST' });
-      fetchCommands();
-    } catch (error) {
-      console.error('Error running command:', error);
-    }
-  };
-
-  const handleStopCommand = async (commandId) => {
-    try {
-      await fetch(`${API_URL}/commands/${commandId}/stop`, { method: 'POST' });
-      fetchCommands();
-    } catch (error) {
-      console.error('Error stopping command:', error);
-    }
-  };
-
-  const fetchCommandDetails = async (commandId) => {
-    try {
-      const response = await fetch(`${API_URL}/commands/${commandId}`);
-      const data = await response.json();
-      setCommands(currentCommands =>
-        currentCommands.map(c => c.id === commandId ? data : c)
-      );
-    } catch (error) {
-      console.error('Error fetching command details:', error);
-    }
-  };
-
-  return (
-    <div className="App">
-      <header>
-        <h1>Command Dashboard</h1>
-        <form onSubmit={handleCreateCommand}>
-          <input
-            type="text"
-            value={newCommand}
-            onChange={(e) => setNewCommand(e.target.value)}
-            placeholder="Enter a new command"
-          />
-          <button type="submit">Create Command</button>
-        </form>
-      </header>
-      <main className="command-list">
-        {commands.map((command) => (
-          <div key={command.id} className="command-card">
-            <h3><code>{command.command}</code></h3>
-            <p className={`status ${command.status}`}>{command.status}</p>
-            <div className="actions">
-              <button onClick={() => handleRunCommand(command.id)} disabled={command.status === 'running'}>Run</button>
-              <button onClick={() => handleStopCommand(command.id)} disabled={command.status !== 'running'}>Stop</button>
-              <button onClick={() => fetchCommandDetails(command.id)}>Refresh</button>
+                <footer className="text-center mt-12 text-gray-500 text-sm">
+                    <p>Built with React & Tailwind CSS. Processes are executed by the Python backend.</p>
+                </footer>
             </div>
-            {(command.stdout || command.stderr) && (
-              <div className="output">
-                {command.stdout && command.stdout.length > 0 && (
-                  <div>
-                    <h4>stdout</h4>
-                    <pre>{command.stdout.join('')}</pre>
-                  </div>
-                )}
-                {command.stderr && command.stderr.length > 0 && (
-                  <div>
-                    <h4>stderr</h4>
-                    <pre>{command.stderr.join('')}</pre>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </main>
-    </div>
-  );
+        </div>
+    );
 }
 
 export default App;
