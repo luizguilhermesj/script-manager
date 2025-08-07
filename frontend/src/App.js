@@ -7,8 +7,7 @@ import { PlusIcon } from './components/Icons';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 function App() {
-    const { commands, loading, addCommand, reorderCommands } = useCommandStore();
-    const [activeTab, setActiveTab] = useState('commands');
+    const { commands, loading, addCommand, reorderCommands, runCommand, stopCommand, updateCommand, deleteCommand, runChain } = useCommandStore();
 
     const onDragEnd = (result) => {
         if (!result.destination) {
@@ -65,7 +64,14 @@ function App() {
                                                         {...provided.draggableProps}
                                                         {...provided.dragHandleProps}
                                                     >
-                                                        <CommandCard command={command} />
+                                                        <CommandCard
+                                                            command={command}
+                                                            runCommand={runCommand}
+                                                            stopCommand={stopCommand}
+                                                            updateCommand={updateCommand}
+                                                            deleteCommand={deleteCommand}
+                                                            runChain={runChain}
+                                                        />
                                                     </div>
                                                 )}
                                             </Draggable>

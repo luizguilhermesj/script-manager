@@ -90,6 +90,23 @@ const useCommandStore = create((set, get) => ({
         });
     },
 
+    runCommand: async (commandId) => {
+        try {
+            await apiRunCommand(commandId);
+        } catch (error) {
+            toast.error(`Failed to run command: ${error.message}`);
+        }
+    },
+
+    stopCommand: async (commandId) => {
+        try {
+            await apiStopCommand(commandId);
+            toast.success('Stop signal sent.');
+        } catch (error) {
+            toast.error(`Failed to stop command: ${error.message}`);
+        }
+    },
+
     runChain: async (commandId) => {
         const commandMap = new Map(get().commands.map(c => [c.id, c]));
         const chain = [];

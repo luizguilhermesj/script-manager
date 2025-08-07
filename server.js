@@ -105,6 +105,7 @@ app.put('/api/commands/:command_id', async (req, res) => {
 
 app.post('/api/commands/:command_id/run', async (req, res) => {
     const { command_id } = req.params;
+    console.log(`Received request to run command with ID: ${command_id}`);
 
     const updateCommandError = async (errorMessage) => {
         const row = await getDb("SELECT data FROM commands WHERE id = ?", [command_id]);
