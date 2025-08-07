@@ -14,11 +14,27 @@ const substituteVariables = (str, variables) => {
     return result;
 };
 
-const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCommand, runChain }) => {
-    const { commands, variables } = useCommandStore();
+const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain }) => {
+    const { commands, variables, updateCommand } = useCommandStore();
     const [isOutputVisible, setIsOutputVisible] = useState(true);
     const [workingDirHistory, setWorkingDirHistory] = useState([]);
+    const [localCommand, setLocalCommand] = useState(command);
 
+    const debouncedUpdate = useMemo(
+        () => debounce((newCommand) => updateCommand(newCommand.id, newCommand), 500),
+        [updateCommand]
+    );
+
+    useEffect(() => {
+        setLocalCommand(command);
+    }, [command]);
+
+    const handleChange = (updates) => {
+        const newCommand = { ...localCommand, ...updates };
+        setLocalCommand(newCommand);
+        debouncedUpdate(newCommand);
+    };
+    
     useEffect(() => {
         const fetchHistory = async () => {
             try {
@@ -36,29 +52,29 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
         if (!result.destination) {
             return;
         }
-        const newArgs = Array.from(command.arguments);
+        const newArgs = Array.from(localCommand.arguments);
         const [removed] = newArgs.splice(result.source.index, 1);
         newArgs.splice(result.destination.index, 0, removed);
-        updateCommand(command.id, { arguments: newArgs });
+        handleChange({ arguments: newArgs });
     };
     
     const implicitDependencies = useMemo(() => {
-        return command.arguments
+        return localCommand.arguments
             .filter(arg => arg.enabled && arg.isFromOutput && arg.sourceCommandId)
             .map(arg => arg.sourceCommandId);
-    }, [command.arguments]);
+    }, [localCommand.arguments]);
 
     const dependencies = useMemo(() => {
-        const allDeps = [...new Set([...(command.dependsOn || []), ...implicitDependencies])];
+        const allDeps = [...new Set([...(localCommand.dependsOn || []), ...implicitDependencies])];
         return allDeps.map(depId => commands.find(c => c.id === depId)).filter(Boolean);
-    }, [command.dependsOn, implicitDependencies, commands]);
+    }, [localCommand.dependsOn, implicitDependencies, commands]);
 
     const areDependenciesMet = useMemo(() => {
         return dependencies.every(dep => dep.status === 'success');
     }, [dependencies]);
 
     const availableDependencies = useMemo(() => {
-        const dependenciesOfThisCommand = new Set(command.dependsOn || []);
+        const dependenciesOfThisCommand = new Set(localCommand.dependsOn || []);
         const getDescendants = (commandId, visited = new Set()) => {
             if (visited.has(commandId)) {
                 return new Set();
@@ -66,10 +82,10 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
             visited.add(commandId);
 
             let descendants = new Set();
-            const command = commands.find(c => c.id === commandId);
-            if (!command || !command.dependsOn) return descendants;
+            const cmd = commands.find(c => c.id === commandId);
+            if (!cmd || !cmd.dependsOn) return descendants;
 
-            for (const depId of command.dependsOn) {
+            for (const depId of cmd.dependsOn) {
                 if (!descendants.has(depId)) {
                     descendants.add(depId);
                     getDescendants(depId, visited).forEach(d => descendants.add(d));
@@ -80,20 +96,20 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
         
         const commandsThatDependOnThis = new Set();
         for (const c of commands) {
-            if (getDescendants(c.id).has(command.id)) {
+            if (getDescendants(c.id).has(localCommand.id)) {
                 commandsThatDependOnThis.add(c.id);
             }
         }
 
         return commands.filter(c => 
-            c.id !== command.id && 
+            c.id !== localCommand.id && 
             !dependenciesOfThisCommand.has(c.id) &&
             !commandsThatDependOnThis.has(c.id)
         );
-    }, [commands, command.id, command.dependsOn]);
+    }, [commands, localCommand.id, localCommand.dependsOn]);
 
     const displayCommand = useMemo(() => {
-        const generatedArgs = command.arguments
+        const generatedArgs = localCommand.arguments
             .filter(arg => arg.enabled)
             .map(arg => {
                 let value = substituteVariables(arg.value, variables);
@@ -125,8 +141,8 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                 }
             });
 
-        return `${substituteVariables(command.executable, variables)} ${generatedArgs.filter(Boolean).join(' ')}`;
-    }, [command.arguments, command.executable, commands, variables]);
+        return `${substituteVariables(localCommand.executable, variables)} ${generatedArgs.filter(Boolean).join(' ')}`;
+    }, [localCommand.arguments, localCommand.executable, commands, variables]);
 
     const displayCommandWithHighlighting = useMemo(() => {
         const parts = displayCommand.split(/({{.*?}})/g).map((part, index) => {
@@ -142,8 +158,8 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
     }, [displayCommand, variables]);
 
     const addArgument = () => {
-        const newArgs = [...command.arguments, createNewArgument()];
-        updateCommand(command.id, { arguments: newArgs });
+        const newArgs = [...localCommand.arguments, createNewArgument()];
+        handleChange({ arguments: newArgs });
     };
 
     const statusStyles = {
@@ -183,7 +199,7 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
     }, [command.name, command.executable]);
 
     const handleBlur = (field, value) => {
-        updateCommand(command.id, { [field]: value });
+        handleChange({ [field]: value });
     };
 
     const [activeTab, setActiveTab] = useState('stdout');
@@ -300,8 +316,8 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                                 <label className="text-sm font-semibold text-gray-400">Working Directory</label>
                                 <input
                                     type="text"
-                                    value={command.workingDirectory || ''}
-                                    onChange={(e) => updateCommand(command.id, { workingDirectory: e.target.value })}
+                                    value={localCommand.workingDirectory || ''}
+                                    onChange={(e) => handleChange({ workingDirectory: e.target.value })}
                                     placeholder="e.g., /home/username"
                                     list="working-dir-history"
                                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -319,8 +335,8 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                                                 <span>{dep.name}</span>
                                                 <button
                                                     onClick={() => {
-                                                        const newDeps = (command.dependsOn || []).filter(id => id !== dep.id);
-                                                        updateCommand(command.id, { dependsOn: newDeps });
+                                                        const newDeps = (localCommand.dependsOn || []).filter(id => id !== dep.id);
+                                                        handleChange({ dependsOn: newDeps });
                                                     }}
                                                     className="ml-2 text-gray-400 hover:text-white"
                                                 >
@@ -333,8 +349,8 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                                         <select
                                             value=""
                                             onChange={(e) => {
-                                                const newDeps = [...(command.dependsOn || []), e.target.value];
-                                                updateCommand(command.id, { dependsOn: newDeps });
+                                                const newDeps = [...(localCommand.dependsOn || []), e.target.value];
+                                                handleChange({ dependsOn: newDeps });
                                             }}
                                             className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-2 focus:ring-indigo-500 focus:border-indigo-500"
                                         >
@@ -380,6 +396,14 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                                                         <ArgumentEditor
                                                             argument={arg}
                                                             commandId={command.id}
+                                                            onUpdate={(updates) => {
+                                                                const newArgs = localCommand.arguments.map(a => a.id === arg.id ? {...a, ...updates} : a);
+                                                                handleChange({arguments: newArgs});
+                                                            }}
+                                                            onDelete={() => {
+                                                                const newArgs = localCommand.arguments.filter(a => a.id !== arg.id);
+                                                                handleChange({arguments: newArgs});
+                                                            }}
                                                         />
                                                     </div>
                                                 )}
@@ -464,5 +488,3 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
         </div>
     );
 };
-
-export default React.memo(CommandCard);
