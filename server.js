@@ -264,7 +264,11 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
         await runDb(`UPDATE commands SET data = ? WHERE id = ?`, [JSON.stringify(commandDef), command_id]);
         io.emit('status_update', commandDef);
         
-        const working_dir = substituteVariables(commandDef.workingDirectory || '', variables) || os.homedir();
+        const working_dir_raw = commandDef.workingDirectory || '';
+        const working_dir = substituteVariables(working_dir_raw, variables) || os.homedir();
+        
+        console.log(`Executing command in working directory: ${working_dir}`);
+
         if (working_dir) {
             await runDb('INSERT OR IGNORE INTO working_directory_history (path) VALUES (?)', [working_dir]);
         }

@@ -135,7 +135,12 @@ const useCommandStore = create((set, get) => ({
 
         for (const command of chain) {
             const currentCommandState = get().commands.find(c => c.id === command.id);
-            if (currentCommandState.status === 'success') continue;
+            if (currentCommandState.status === 'success') {
+                toast(`Skipping already successful: ${command.name}`);
+                continue;
+            }
+
+            toast(`Running: ${command.name}...`);
 
             try {
                 await new Promise((resolve, reject) => {
@@ -146,18 +151,25 @@ const useCommandStore = create((set, get) => ({
                                 resolve();
                             } else if (data.status === 'error' || data.status === 'stopped') {
                                 socket.off('status_update', onStatusUpdate);
-                                reject(new Error(`Command "${command.name}" failed with status: ${data.status}`));
+                                reject(new Error(`Command "${command.name}" failed`));
                             }
                         }
                     };
+
                     socket.on('status_update', onStatusUpdate);
-                    apiRunCommand(command.id).catch(reject);
+
+                    apiRunCommand(command.id).catch((err) => {
+                        socket.off('status_update', onStatusUpdate);
+                        reject(err);
+                    });
                 });
+                toast.success(`Finished: ${command.name}`);
             } catch (error) {
                 toast.error(error.message);
-                return;
+                return; 
             }
         }
+        toast.success("Command chain finished successfully.");
     },
 
     // --- Variable Actions ---
