@@ -6,8 +6,16 @@ import useCommandStore from '../store';
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
-const CommandCard = ({ command }) => {
-    const { commands, updateCommand, deleteCommand, runCommand, stopCommand, runChain } = useCommandStore();
+const substituteVariables = (str, variables) => {
+    let result = str;
+    for (const variable of variables) {
+        result = result.replace(new RegExp(`{{${variable.name}}}`, 'g'), variable.value);
+    }
+    return result;
+};
+
+const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCommand, runChain }) => {
+    const { commands, variables } = useCommandStore();
     const [isOutputVisible, setIsOutputVisible] = useState(true);
     const [workingDirHistory, setWorkingDirHistory] = useState([]);
 
@@ -53,7 +61,7 @@ const CommandCard = ({ command }) => {
         const generatedArgs = command.arguments
             .filter(arg => arg.enabled)
             .map(arg => {
-                let value = arg.value;
+                let value = substituteVariables(arg.value, variables);
                 if (arg.isFromOutput) {
                     const sourceCommand = commands.find(c => c.id === arg.sourceCommandId);
                     if (!sourceCommand) {
@@ -64,7 +72,7 @@ const CommandCard = ({ command }) => {
                         value = '<add regex>';
                     } else {
                         try {
-                            const regex = new RegExp(arg.regex);
+                            const regex = new RegExp(substituteVariables(arg.regex, variables));
                             const fullOutput = sourceCommand.output.join('\n');
                             const match = fullOutput.match(regex);
                             value = (match && match[1]) ? match[1] : '<no match>';
@@ -78,27 +86,28 @@ const CommandCard = ({ command }) => {
                     return value || '';
                 } else {
                     const joiner = arg.joiner === undefined ? ' ' : arg.joiner;
-                    return value ? `${arg.name}${joiner}${value}` : arg.name;
+                    return value ? `${substituteVariables(arg.name, variables)}${joiner}${value}` : substituteVariables(arg.name, variables);
                 }
             });
 
-        return `${command.executable} ${generatedArgs.filter(Boolean).join(' ')}`;
-    }, [command.arguments, command.executable, commands]);
+        return `${substituteVariables(command.executable, variables)} ${generatedArgs.filter(Boolean).join(' ')}`;
+    }, [command.arguments, command.executable, commands, variables]);
 
-    const updateArgument = (argId, updates) => {
-        const newArgs = command.arguments.map(arg =>
-            arg.id === argId ? { ...arg, ...updates } : arg
-        );
-        updateCommand(command.id, { arguments: newArgs });
-    };
+    const displayCommandWithHighlighting = useMemo(() => {
+        const parts = displayCommand.split(/({{.*?}})/g).map((part, index) => {
+            const match = part.match(/{{(.*?)}}/);
+            if (match) {
+                const varName = match[1];
+                const variable = variables.find(v => v.name === varName);
+                return <span key={index} className="variable">{variable ? variable.value : 'undefined'}</span>;
+            }
+            return part;
+        });
+        return <span>{parts}</span>;
+    }, [displayCommand, variables]);
 
     const addArgument = () => {
         const newArgs = [...command.arguments, createNewArgument()];
-        updateCommand(command.id, { arguments: newArgs });
-    };
-
-    const deleteArgument = (argId) => {
-        const newArgs = command.arguments.filter(arg => arg.id !== argId);
         updateCommand(command.id, { arguments: newArgs });
     };
 
@@ -266,10 +275,27 @@ const CommandCard = ({ command }) => {
                                     {workingDirHistory.map((path, i) => <option key={i} value={path} />)}
                                 </datalist>
                             </div>
+                            <div className="md:col-span-3">
+                                <label className="text-sm font-semibold text-gray-400">Explicit Dependencies</label>
+                                <select
+                                    multiple
+                                    value={command.dependsOn || []}
+                                    onChange={(e) => {
+                                        const selectedIds = Array.from(e.target.selectedOptions, option => option.value);
+                                        updateCommand(command.id, { dependsOn: selectedIds });
+                                    }}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-1 focus:ring-indigo-500 focus:border-indigo-500 h-24"
+                                >
+                                    {commands.filter(c => c.id !== command.id).map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 mt-1">Select commands that must run successfully before this one.</p>
+                            </div>
                             <div className="md:col-span-3 relative">
                                 <label className="text-sm font-semibold text-gray-400">Generated Command</label>
                                 <div className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 mt-1 font-mono text-sm text-green-400 overflow-x-auto whitespace-pre">
-                                    {displayCommand || <span className="text-gray-500">Press 'Run' to generate...</span>}
+                                    {displayCommandWithHighlighting || <span className="text-gray-500">Press 'Run' to generate...</span>}
                                 </div>
                                 <button
                                     onClick={() => navigator.clipboard.writeText(displayCommand)}
@@ -284,15 +310,31 @@ const CommandCard = ({ command }) => {
                         </div>
 
                         <h3 className="text-lg font-semibold mb-3 text-gray-300">Arguments</h3>
-                        <div className="space-y-2">
-                            {command.arguments.map(arg => (
-                                <ArgumentEditor
-                                    key={arg.id}
-                                    argument={arg}
-                                    commandId={command.id}
-                                />
-                            ))}
-                        </div>
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <Droppable droppableId={`args-${command.id}`}>
+                                {(provided) => (
+                                    <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                                        {command.arguments.map((arg, index) => (
+                                            <Draggable key={arg.id} draggableId={arg.id} index={index}>
+                                                {(provided) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                    >
+                                                        <ArgumentEditor
+                                                            argument={arg}
+                                                            commandId={command.id}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
                         <button
                             onClick={addArgument}
                             className="mt-4 flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-semibold text-sm"

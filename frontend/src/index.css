@@ -91,6 +91,10 @@ code {
   margin-top: 0;
 }
 
-.command-card .output pre {
-  margin: 0;
+.variable {
+  background-color: #4a5568;
+  color: #a0aec0;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-weight: bold;
 }

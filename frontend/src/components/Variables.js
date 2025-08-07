@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import useCommandStore from '../store';
-import { PlusIcon, TrashIcon, SaveIcon } from './Icons';
+import { PlusIcon, TrashIcon } from './Icons';
 
 const Variables = () => {
     const { variables, addVariable, updateVariable, deleteVariable } = useCommandStore();

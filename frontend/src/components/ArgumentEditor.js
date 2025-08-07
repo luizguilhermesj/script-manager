@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import useCommandStore from '../store';
-import { TrashIcon, LinkIcon } from './Icons';
+import { TrashIcon } from './Icons';
 
-import { Draggable } from '@hello-pangea/dnd';
-
-const ArgumentEditor = ({ argument, commandId, index }) => {
+const ArgumentEditor = ({ argument, commandId }) => {
     const { commands, updateCommand } = useCommandStore();
     const [localName, setLocalName] = useState(argument.name);
     const [localValue, setLocalValue] = useState(argument.value);
