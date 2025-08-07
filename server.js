@@ -17,29 +17,37 @@ const DATABASE = path.join(__dirname, 'commands.db');
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend', 'build')));
 
-// --- Database Functions ---
+// --- Database Setup ---
 const fs = require('fs');
 
-const db = new sqlite3.Database(DATABASE, (err) => {
-    if (err) {
-        console.error('Error opening database', err.message);
-    } else {
-        console.log('Connected to the SQLite database.');
-        fs.readFile(path.join(__dirname, 'schema.sql'), 'utf8', (err, data) => {
+let db;
+
+async function initializeDatabase() {
+    return new Promise((resolve, reject) => {
+        db = new sqlite3.Database(DATABASE, (err) => {
             if (err) {
-                console.error("Could not read schema.sql file:", err);
-                return;
+                console.error('Error opening database', err.message);
+                return reject(err);
             }
-            db.exec(data, (err) => {
+            console.log('Connected to the SQLite database.');
+            fs.readFile(path.join(__dirname, 'schema.sql'), 'utf8', (err, data) => {
                 if (err) {
-                    console.error("Error executing schema:", err);
-                } else {
-                    console.log("Database schema initialized successfully.");
+                    console.error("Could not read schema.sql file:", err);
+                    return reject(err);
                 }
+                db.exec(data, (err) => {
+                    if (err) {
+                        console.error("Error executing schema:", err);
+                        return reject(err);
+                    }
+                    console.log("Database schema initialized successfully.");
+                    resolve();
+                });
             });
         });
-    }
-});
+    });
+}
+
 
 const getDb = (query, params) => {
     return new Promise((resolve, reject) => {
@@ -120,7 +128,7 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
         if (processes[command_id] && processes[command_id].exitCode === null) {
             return res.status(400).json({ 'error': 'Command is already running' });
         }
-
+        
         const allDeps = [...new Set([...(commandDef.dependsOn || []), ...commandDef.arguments
             .filter(arg => arg.enabled && arg.isFromOutput && arg.sourceCommandId)
             .map(arg => arg.sourceCommandId)])];
@@ -218,11 +226,16 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
         await runDb(`UPDATE commands SET data = ? WHERE id = ?`, [JSON.stringify(commandDef), command_id]);
         io.emit('status_update', commandDef);
         
+        const working_dir = substituteVariables(commandDef.workingDirectory || os.homedir());
+        if (working_dir) {
+            await runDb('INSERT OR IGNORE INTO working_directory_history (path) VALUES (?)', [working_dir]);
+        }
+        
         const proc = spawn(commandToRun, { 
             shell: true, 
             stdio: ['pipe', 'pipe', 'pipe'], 
             detached: true,
-            cwd: substituteVariables(commandDef.workingDirectory || os.homedir())
+            cwd: working_dir
         });
         processes[command_id] = proc;
 
@@ -298,6 +311,47 @@ app.get('/api/commands/:command_id/arguments/:argument_name/history', async (req
 });
 
 
+// --- Variables API ---
+app.get('/api/variables', async (req, res) => {
+    try {
+        const rows = await getAllDb("SELECT * FROM variables", []);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ "error": err.message });
+    }
+});
+
+app.post('/api/variables', async (req, res) => {
+    const { id, name, value } = req.body;
+    try {
+        await runDb('INSERT INTO variables (id, name, value) VALUES (?, ?, ?)', [id, name, value]);
+        res.json({ id, name, value });
+    } catch (err) {
+        res.status(500).json({ "error": err.message });
+    }
+});
+
+app.put('/api/variables/:id', async (req, res) => {
+    const { id } = req.params;
+    const { name, value } = req.body;
+    try {
+        await runDb('UPDATE variables SET name = ?, value = ? WHERE id = ?', [name, value, id]);
+        res.json({ id, name, value });
+    } catch (err) {
+        res.status(500).json({ "error": err.message });
+    }
+});
+
+app.delete('/api/variables/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await runDb('DELETE FROM variables WHERE id = ?', [id]);
+        res.json({ message: 'Variable deleted' });
+    } catch (err) {
+        res.status(500).json({ "error": err.message });
+    }
+});
+
 // --- Socket.IO Handlers ---
 io.on('connection', (socket) => {
     console.log('a user connected');
@@ -338,4 +392,19 @@ io.on('connection', (socket) => {
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
 });
+
+async function startServer() {
+    try {
+        await initializeDatabase();
+        server.listen(PORT, () => {
+            console.log(`Server listening on port ${PORT}`);
+        });
+    } catch (err) {
+        console.error("Failed to start the server:", err);
+        process.exit(1);
+    }
+}
+
+startServer();
+
 
