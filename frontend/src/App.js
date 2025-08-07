@@ -8,6 +8,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 function App() {
     const { commands, loading, addCommand, reorderCommands, runCommand, stopCommand, updateCommand, deleteCommand, runChain } = useCommandStore();
+    const [activeTab, setActiveTab] = useState('commands');
 
     const onDragEnd = (result) => {
         if (!result.destination) {
