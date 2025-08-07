@@ -91,9 +91,46 @@ app.get('/api/commands', async (req, res) => {
     }
 });
 
+const validateDependencies = async (commandId, dependsOn) => {
+    const getAncestors = async (id, visited = new Set()) => {
+        if (visited.has(id)) {
+            return new Set(); // Cycle detected
+        }
+        visited.add(id);
+
+        const row = await getDb("SELECT data FROM commands WHERE id = ?", [id]);
+        if (!row) return new Set();
+
+        const command = JSON.parse(row.data);
+        const ancestors = new Set(command.dependsOn || []);
+
+        for (const depId of command.dependsOn || []) {
+            const parentAncestors = await getAncestors(depId, visited);
+            parentAncestors.forEach(a => ancestors.add(a));
+        }
+        return ancestors;
+    };
+
+    for (const depId of dependsOn) {
+        const ancestors = await getAncestors(depId);
+        if (ancestors.has(commandId)) {
+            return false; // Circular dependency detected
+        }
+    }
+    return true;
+};
+
 app.put('/api/commands/:command_id', async (req, res) => {
     const { command_id } = req.params;
     const data = req.body;
+
+    if (data.dependsOn) {
+        const isValid = await validateDependencies(command_id, data.dependsOn);
+        if (!isValid) {
+            return res.status(400).json({ error: "Circular dependency detected." });
+        }
+    }
+
     try {
         await runDb(`UPDATE commands SET data = ? WHERE id = ?`, [JSON.stringify(data), command_id]);
         io.emit('command_updated', data);

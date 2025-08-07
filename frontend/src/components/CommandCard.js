@@ -57,6 +57,36 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
         return dependencies.every(dep => dep.status === 'success');
     }, [dependencies]);
 
+    const availableDependencies = useMemo(() => {
+        const dependenciesOfThisCommand = new Set(command.dependsOn || []);
+        const getDescendants = (commandId) => {
+            let descendants = new Set();
+            const command = commands.find(c => c.id === commandId);
+            if (!command || !command.dependsOn) return descendants;
+
+            for (const depId of command.dependsOn) {
+                if (!descendants.has(depId)) {
+                    descendants.add(depId);
+                    getDescendants(depId).forEach(d => descendants.add(d));
+                }
+            }
+            return descendants;
+        };
+        
+        const commandsThatDependOnThis = new Set();
+        for (const c of commands) {
+            if (getDescendants(c.id).has(command.id)) {
+                commandsThatDependOnThis.add(c.id);
+            }
+        }
+
+        return commands.filter(c => 
+            c.id !== command.id && 
+            !dependenciesOfThisCommand.has(c.id) &&
+            !commandsThatDependOnThis.has(c.id)
+        );
+    }, [commands, command.id, command.dependsOn]);
+
     const displayCommand = useMemo(() => {
         const generatedArgs = command.arguments
             .filter(arg => arg.enabled)
@@ -277,19 +307,39 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                             </div>
                             <div className="md:col-span-3">
                                 <label className="text-sm font-semibold text-gray-400">Explicit Dependencies</label>
-                                <select
-                                    multiple
-                                    value={command.dependsOn || []}
-                                    onChange={(e) => {
-                                        const selectedIds = Array.from(e.target.selectedOptions, option => option.value);
-                                        updateCommand(command.id, { dependsOn: selectedIds });
-                                    }}
-                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-1 focus:ring-indigo-500 focus:border-indigo-500 h-24"
-                                >
-                                    {commands.filter(c => c.id !== command.id).map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
+                                <div className="mt-1">
+                                    <div className="flex flex-wrap gap-2">
+                                        {dependencies.map(dep => (
+                                            <div key={dep.id} className="flex items-center bg-gray-700 rounded-full px-3 py-1 text-sm">
+                                                <span>{dep.name}</span>
+                                                <button
+                                                    onClick={() => {
+                                                        const newDeps = (command.dependsOn || []).filter(id => id !== dep.id);
+                                                        updateCommand(command.id, { dependsOn: newDeps });
+                                                    }}
+                                                    className="ml-2 text-gray-400 hover:text-white"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {availableDependencies.length > 0 && (
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                const newDeps = [...(command.dependsOn || []), e.target.value];
+                                                updateCommand(command.id, { dependsOn: newDeps });
+                                            }}
+                                            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                        >
+                                            <option value="" disabled>Add a dependency...</option>
+                                            {availableDependencies.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
                                 <p className="text-xs text-gray-500 mt-1">Select commands that must run successfully before this one.</p>
                             </div>
                             <div className="md:col-span-3 relative">
@@ -368,7 +418,7 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                                         >
                                             Clear
                                         </button>
-                                    </div>
+                                    }
                                 </div>
 
                                 <div className="border-b border-gray-600 mb-2">
