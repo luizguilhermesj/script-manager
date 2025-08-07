@@ -457,14 +457,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                                             onClick={() => setActiveTab('stdout')}
                                             className={`py-2 px-4 text-sm font-medium border-b-2 ${activeTab === 'stdout' ? 'border-indigo-500 text-white' : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-300'}`}
                                         >
-                                            Standard Output
-                                        </button>
-                                        <button
-                                            onClick={() => setActiveTab('stderr')}
-                                            disabled={!command.errorOutput || command.errorOutput.length === 0}
-                                            className={`py-2 px-4 text-sm font-medium border-b-2 ${activeTab === 'stderr' ? 'border-red-500 text-white' : 'border-transparent text-gray-400'} ${(!command.errorOutput || command.errorOutput.length === 0) ? 'opacity-50 cursor-not-allowed' : 'hover:text-gray-300 hover:border-gray-300'}`}
-                                        >
-                                            Error Output
+                                            Output
                                         </button>
                                     </div>
                                 </div>
@@ -473,11 +466,6 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                                     {activeTab === 'stdout' && (
                                         <pre className="font-mono text-sm text-gray-300 bg-black/50 p-3 rounded-md h-48 overflow-y-auto">
                                             {command.output && command.output.length > 0 ? command.output.join('\n') : <span className="text-gray-500">No output yet...</span>}
-                                        </pre>
-                                    )}
-                                    {activeTab === 'stderr' && (
-                                        <pre className="font-mono text-sm text-red-400 bg-black/50 p-3 rounded-md h-48 overflow-y-auto">
-                                            {command.errorOutput && command.errorOutput.length > 0 ? command.errorOutput.join('\n') : <span className="text-gray-500">No errors yet...</span>}
                                         </pre>
                                     )}
                                 </div>

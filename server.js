@@ -221,7 +221,7 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
                     throw new Error(`Argument '${arg_name}' is missing a regex pattern.`);
                 }
 
-                const full_output = (sourceCommandDef.output || []).join('\n');
+                const full_output = (sourceCommandDef.output || []).slice(1).map(line => line.content).join('\n');
                 
                 try {
                     const match = full_output.match(new RegExp(substituteVariables(arg.regex)));

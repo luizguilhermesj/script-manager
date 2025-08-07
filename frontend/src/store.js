@@ -252,22 +252,11 @@ const useCommandStore = create((set, get) => ({
             }));
         });
 
-        socket.on('stdout', (data) => {
+        socket.on('output', (data) => {
             set(state => ({
                 commands: state.commands.map(cmd => {
                     if (cmd.id === data.command_id) {
-                        return { ...cmd, output: [...(cmd.output || []), data.output] };
-                    }
-                    return cmd;
-                })
-            }));
-        });
-
-        socket.on('stderr', (data) => {
-            set(state => ({
-                commands: state.commands.map(cmd => {
-                    if (cmd.id === data.command_id) {
-                        return { ...cmd, errorOutput: [...(cmd.errorOutput || []), data.output] };
+                        return { ...cmd, output: [...(cmd.output || []), {type: data.type, content: data.content}] };
                     }
                     return cmd;
                 })
