@@ -4,6 +4,7 @@ export const createNewArgument = () => ({
     value: '',
     type: 'editable', // 'editable', 'fixed', 'previous-values', 'variable'
     isPositional: false,
+    joiner: ' ',
     sourceCommandId: null, // For variable type
     regex: '', // For variable type
     enabled: true,

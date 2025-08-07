@@ -45,9 +45,10 @@ const CommandCard = ({ command }) => {
                 }
 
                 if (arg.isPositional) {
-                    return value || '';
+                    return value ? `'${value}'` : '';
                 } else {
-                    return value ? `${arg.name} ${value}` : arg.name;
+                    const joiner = arg.joiner === undefined ? ' ' : arg.joiner;
+                    return value ? `${arg.name}${joiner}'${value}'` : arg.name;
                 }
             });
 

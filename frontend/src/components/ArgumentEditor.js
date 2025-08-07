@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useCommandStore from '../store';
 import { ChevronUpIcon, ChevronDownIcon, TrashIcon, LinkIcon } from './Icons';
 
-const API_URL = 'http://127.0.0.1:5000';
+const API_URL = '/api';
 
 const ArgumentEditor = ({ argument, commandId }) => {
     const { commands, updateCommand } = useCommandStore();
@@ -121,6 +121,15 @@ const ArgumentEditor = ({ argument, commandId }) => {
                         placeholder={argument.isPositional ? "Descriptive Label" : "--argument-name"}
                         className="font-mono text-sm bg-transparent focus:bg-gray-700 rounded px-1 py-0.5 w-1/3"
                     />
+                    {!argument.isPositional && (
+                        <input
+                            type="text"
+                            value={argument.joiner === undefined ? ' ' : argument.joiner}
+                            onChange={(e) => handleUpdateArgument({ joiner: e.target.value })}
+                            className="font-mono text-sm bg-gray-700 rounded px-1 py-0.5 w-8 text-center"
+                            title="Joiner character"
+                        />
+                    )}
                 </div>
                 <div className="flex items-center gap-4">
                     <label className="text-xs flex items-center gap-1 text-gray-400">

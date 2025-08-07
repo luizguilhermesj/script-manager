@@ -1,7 +1,6 @@
 import { io } from 'socket.io-client';
 
-const API_URL = 'http://127.0.0.1:5000';
-const socket = io(API_URL);
+const socket = io();
 
 const handleResponse = async (response) => {
     if (!response.ok) {
@@ -16,7 +15,7 @@ const handleResponse = async (response) => {
 };
 
 export const getCommands = async () => {
-    const response = await fetch(`${API_URL}/commands`);
+    const response = await fetch(`/api/commands`);
     if (!response.ok) {
         throw new Error('Failed to fetch commands');
     }
@@ -24,7 +23,7 @@ export const getCommands = async () => {
 };
 
 export const updateCommand = async (command) => {
-    const response = await fetch(`${API_URL}/commands/${command.id}`, {
+    const response = await fetch(`/api/commands/${command.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(command),
@@ -33,14 +32,14 @@ export const updateCommand = async (command) => {
 };
 
 export const runCommand = async (commandId) => {
-    const response = await fetch(`${API_URL}/commands/${commandId}/run`, {
+    const response = await fetch(`/api/commands/${commandId}/run`, {
         method: 'POST',
     });
     return handleResponse(response);
 };
 
 export const stopCommand = async (commandId) => {
-    const response = await fetch(`${API_URL}/commands/${commandId}/stop`, {
+    const response = await fetch(`/api/commands/${commandId}/stop`, {
         method: 'POST',
     });
     return handleResponse(response);
