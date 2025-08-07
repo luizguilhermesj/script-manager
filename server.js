@@ -269,6 +269,10 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
         
         console.log(`Executing command in working directory: ${working_dir}`);
 
+        if (!fs.existsSync(working_dir)) {
+            throw new Error(`Working directory not found: ${working_dir}`);
+        }
+
         if (working_dir) {
             await runDb('INSERT OR IGNORE INTO working_directory_history (path) VALUES (?)', [working_dir]);
         }

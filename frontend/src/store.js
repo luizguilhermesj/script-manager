@@ -134,12 +134,6 @@ const useCommandStore = create((set, get) => ({
         getDependencies(commandId);
 
         for (const command of chain) {
-            const currentCommandState = get().commands.find(c => c.id === command.id);
-            if (currentCommandState.status === 'success') {
-                toast(`Skipping already successful: ${command.name}`);
-                continue;
-            }
-
             toast(`Running: ${command.name}...`);
 
             try {
