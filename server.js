@@ -198,7 +198,6 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
         for (const arg of arguments) {
             if (!arg.enabled) continue;
 
-            console.log('ARG', arg);
             let final_value = substituteVariables(arg.value || '');
             const arg_name = substituteVariables(arg.name || '');
 
@@ -240,7 +239,6 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
                 await runDb('INSERT OR IGNORE INTO argument_history (command_id, argument_name, value) VALUES (?, ?, ?)', [command_id, arg_name, final_value]);
             }
 
-            console.log('final', final_value)
             if (arg.isPositional) {
                 if (final_value) generatedArgs.push(final_value);
             } else {
