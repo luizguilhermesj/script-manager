@@ -3,6 +3,7 @@ import ArgumentEditor from './ArgumentEditor';
 import { PlusIcon, TrashIcon, PlayIcon, StopIcon, ChevronUpIcon, ChevronDownIcon, SavingIcon, SavedIcon, ErrorIcon } from './Icons';
 import { createNewArgument } from '../utils';
 import useCommandStore from '../store';
+import debounce from 'lodash/debounce';
 
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -75,20 +76,20 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
 
     const availableDependencies = useMemo(() => {
         const dependenciesOfThisCommand = new Set(localCommand.dependsOn || []);
-        const getDescendants = (commandId, visited = new Set()) => {
+        const getDescendants = (commandId, commands, visited = new Set()) => {
             if (visited.has(commandId)) {
                 return new Set();
             }
             visited.add(commandId);
 
             let descendants = new Set();
-            const cmd = commands.find(c => c.id === commandId);
-            if (!cmd || !cmd.dependsOn) return descendants;
+            const command = commands.find(c => c.id === commandId);
+            if (!command || !command.dependsOn) return descendants;
 
-            for (const depId of cmd.dependsOn) {
+            for (const depId of command.dependsOn) {
                 if (!descendants.has(depId)) {
                     descendants.add(depId);
-                    getDescendants(depId, visited).forEach(d => descendants.add(d));
+                    getDescendants(depId, commands, visited).forEach(d => descendants.add(d));
                 }
             }
             return descendants;
@@ -96,7 +97,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
         
         const commandsThatDependOnThis = new Set();
         for (const c of commands) {
-            if (getDescendants(c.id).has(localCommand.id)) {
+            if (getDescendants(c.id, commands).has(command.id)) {
                 commandsThatDependOnThis.add(c.id);
             }
         }
@@ -488,3 +489,5 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
         </div>
     );
 };
+
+export default React.memo(CommandCard);
