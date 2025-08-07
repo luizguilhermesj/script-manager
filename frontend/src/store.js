@@ -133,22 +133,21 @@ const useCommandStore = create((set, get) => ({
             if (currentCommandState.status === 'success') continue;
 
             try {
-                const commandFinishedPromise = new Promise((resolve, reject) => {
+                await new Promise((resolve, reject) => {
                     const onStatusUpdate = (data) => {
                         if (data.id === command.id) {
-                            if (data.status === 'success' || data.status === 'stopped') {
+                            if (data.status === 'success') {
                                 socket.off('status_update', onStatusUpdate);
                                 resolve();
-                            } else if (data.status === 'error') {
+                            } else if (data.status === 'error' || data.status === 'stopped') {
                                 socket.off('status_update', onStatusUpdate);
                                 reject(new Error(`Command "${command.name}" failed with status: ${data.status}`));
                             }
                         }
                     };
                     socket.on('status_update', onStatusUpdate);
+                    apiRunCommand(command.id).catch(reject);
                 });
-                await apiRunCommand(command.id);
-                await commandFinishedPromise;
             } catch (error) {
                 toast.error(error.message);
                 return;
