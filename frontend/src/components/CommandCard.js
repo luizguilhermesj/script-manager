@@ -59,7 +59,12 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
 
     const availableDependencies = useMemo(() => {
         const dependenciesOfThisCommand = new Set(command.dependsOn || []);
-        const getDescendants = (commandId) => {
+        const getDescendants = (commandId, visited = new Set()) => {
+            if (visited.has(commandId)) {
+                return new Set();
+            }
+            visited.add(commandId);
+
             let descendants = new Set();
             const command = commands.find(c => c.id === commandId);
             if (!command || !command.dependsOn) return descendants;
@@ -67,7 +72,7 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
             for (const depId of command.dependsOn) {
                 if (!descendants.has(depId)) {
                     descendants.add(depId);
-                    getDescendants(depId).forEach(d => descendants.add(d));
+                    getDescendants(depId, visited).forEach(d => descendants.add(d));
                 }
             }
             return descendants;
@@ -418,7 +423,7 @@ const CommandCard = ({ command, runCommand, stopCommand, updateCommand, deleteCo
                                         >
                                             Clear
                                         </button>
-                                    }
+                                    </div>
                                 </div>
 
                                 <div className="border-b border-gray-600 mb-2">
