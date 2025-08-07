@@ -5,7 +5,9 @@ const socket = io();
 const handleResponse = async (response) => {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'An unknown API error occurred' }));
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        const error = new Error(errorData.error || `Request failed with status ${response.status}`);
+        error.status = response.status;
+        throw error;
     }
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {

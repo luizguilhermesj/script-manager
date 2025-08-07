@@ -103,7 +103,12 @@ const useCommandStore = create((set, get) => ({
             await apiStopCommand(commandId);
             toast.success('Stop signal sent.');
         } catch (error) {
-            toast.error(`Failed to stop command: ${error.message}`);
+            if (error.status === 400 && error.message === 'Command is not running') {
+                // The backend confirms the command is not running, so we can reset the state.
+                get().updateCommand(commandId, { status: 'idle', returnCode: null });
+            } else {
+                toast.error(`Failed to stop command: ${error.message}`);
+            }
         }
     },
 
