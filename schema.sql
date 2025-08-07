@@ -11,3 +11,16 @@ CREATE TABLE IF NOT EXISTS argument_history (
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(command_id, argument_name, value)
 );
+
+CREATE TABLE IF NOT EXISTS working_directory_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  path TEXT NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(path)
+);
+
+CREATE TABLE IF NOT EXISTS variables (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  value TEXT NOT NULL
+);

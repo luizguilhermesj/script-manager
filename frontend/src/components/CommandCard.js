@@ -4,16 +4,46 @@ import { PlusIcon, TrashIcon, PlayIcon, StopIcon, ChevronUpIcon, ChevronDownIcon
 import { createNewArgument } from '../utils';
 import useCommandStore from '../store';
 
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+
 const CommandCard = ({ command }) => {
     const { commands, updateCommand, deleteCommand, runCommand, stopCommand, runChain } = useCommandStore();
     const [isOutputVisible, setIsOutputVisible] = useState(true);
+    const [workingDirHistory, setWorkingDirHistory] = useState([]);
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const response = await fetch('/api/working_directory/history');
+                const data = await response.json();
+                setWorkingDirHistory(data);
+            } catch (error) {
+                console.error('Error fetching working directory history:', error);
+            }
+        };
+        fetchHistory();
+    }, []);
+
+    const onDragEnd = (result) => {
+        if (!result.destination) {
+            return;
+        }
+        const newArgs = Array.from(command.arguments);
+        const [removed] = newArgs.splice(result.source.index, 1);
+        newArgs.splice(result.destination.index, 0, removed);
+        updateCommand(command.id, { arguments: newArgs });
+    };
+    
+    const implicitDependencies = useMemo(() => {
+        return command.arguments
+            .filter(arg => arg.enabled && arg.isFromOutput && arg.sourceCommandId)
+            .map(arg => arg.sourceCommandId);
+    }, [command.arguments]);
 
     const dependencies = useMemo(() => {
-        return command.arguments
-            .filter(arg => arg.enabled && arg.type === 'variable' && arg.sourceCommandId)
-            .map(arg => commands.find(c => c.id === arg.sourceCommandId))
-            .filter(Boolean);
-    }, [command.arguments, commands]);
+        const allDeps = [...new Set([...(command.dependsOn || []), ...implicitDependencies])];
+        return allDeps.map(depId => commands.find(c => c.id === depId)).filter(Boolean);
+    }, [command.dependsOn, implicitDependencies, commands]);
 
     const areDependenciesMet = useMemo(() => {
         return dependencies.every(dep => dep.status === 'success');
@@ -24,7 +54,7 @@ const CommandCard = ({ command }) => {
             .filter(arg => arg.enabled)
             .map(arg => {
                 let value = arg.value;
-                if (arg.type === 'variable') {
+                if (arg.isFromOutput) {
                     const sourceCommand = commands.find(c => c.id === arg.sourceCommandId);
                     if (!sourceCommand) {
                         value = '<invalid source>';
@@ -45,10 +75,10 @@ const CommandCard = ({ command }) => {
                 }
 
                 if (arg.isPositional) {
-                    return value ? `'${value}'` : '';
+                    return value || '';
                 } else {
                     const joiner = arg.joiner === undefined ? ' ' : arg.joiner;
-                    return value ? `${arg.name}${joiner}'${value}'` : arg.name;
+                    return value ? `${arg.name}${joiner}${value}` : arg.name;
                 }
             });
 
@@ -229,8 +259,12 @@ const CommandCard = ({ command }) => {
                                     value={command.workingDirectory || ''}
                                     onChange={(e) => updateCommand(command.id, { workingDirectory: e.target.value })}
                                     placeholder="e.g., /home/username"
+                                    list="working-dir-history"
                                     className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 mt-1 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
+                                <datalist id="working-dir-history">
+                                    {workingDirHistory.map((path, i) => <option key={i} value={path} />)}
+                                </datalist>
                             </div>
                             <div className="md:col-span-3 relative">
                                 <label className="text-sm font-semibold text-gray-400">Generated Command</label>

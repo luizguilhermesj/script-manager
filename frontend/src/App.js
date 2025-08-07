@@ -1,11 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import useCommandStore from './store';
 import CommandCard from './components/CommandCard';
+import Variables from './components/Variables';
 import { PlusIcon } from './components/Icons';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 function App() {
-    const { commands, loading, addCommand, runCommand, stopCommand, updateCommand, deleteCommand, runChain } = useCommandStore();
+    const { commands, loading, addCommand, reorderCommands } = useCommandStore();
+    const [activeTab, setActiveTab] = useState('commands');
+
+    const onDragEnd = (result) => {
+        if (!result.destination) {
+            return;
+        }
+        reorderCommands(result.source.index, result.destination.index);
+    };
 
     if (loading) {
         return <div className="bg-gray-900 min-h-screen text-white flex items-center justify-center">Loading...</div>;
@@ -26,30 +36,59 @@ function App() {
                     </p>
                 </header>
 
-                <div className="space-y-6">
-                    {commands.map(command => (
-                        <CommandCard
-                            key={command.id}
-                            command={command}
-                            commands={commands}
-                            updateCommand={updateCommand}
-                            deleteCommand={deleteCommand}
-                            runCommand={runCommand}
-                            stopCommand={stopCommand}
-                            runChain={runChain}
-                        />
-                    ))}
-                </div>
-
-                <div className="mt-8">
+                <div className="flex border-b border-gray-700 mb-6">
                     <button
-                        onClick={addCommand}
-                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                        onClick={() => setActiveTab('commands')}
+                        className={`py-2 px-4 text-sm font-medium ${activeTab === 'commands' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}
                     >
-                        <PlusIcon />
-                        <span>Add New Command</span>
+                        Commands
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('variables')}
+                        className={`py-2 px-4 text-sm font-medium ${activeTab === 'variables' ? 'border-b-2 border-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                    >
+                        Global Variables
                     </button>
                 </div>
+
+                {activeTab === 'commands' && (
+                    <>
+                        <DragDropContext onDragEnd={onDragEnd}>
+                            <Droppable droppableId="commands">
+                                {(provided) => (
+                                    <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-6">
+                                        {commands.map((command, index) => (
+                                            <Draggable key={command.id} draggableId={command.id} index={index}>
+                                                {(provided) => (
+                                                    <div
+                                                        ref={provided.innerRef}
+                                                        {...provided.draggableProps}
+                                                        {...provided.dragHandleProps}
+                                                    >
+                                                        <CommandCard command={command} />
+                                                    </div>
+                                                )}
+                                            </Draggable>
+                                        ))}
+                                        {provided.placeholder}
+                                    </div>
+                                )}
+                            </Droppable>
+                        </DragDropContext>
+
+                        <div className="mt-8">
+                            <button
+                                onClick={addCommand}
+                                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                            >
+                                <PlusIcon />
+                                <span>Add New Command</span>
+                            </button>
+                        </div>
+                    </>
+                )}
+
+                {activeTab === 'variables' && <Variables />}
             </div>
         </div>
     );

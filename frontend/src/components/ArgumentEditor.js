@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import useCommandStore from '../store';
-import { ChevronUpIcon, ChevronDownIcon, TrashIcon, LinkIcon } from './Icons';
+import { TrashIcon, LinkIcon } from './Icons';
 
-const API_URL = '/api';
+import { Draggable } from '@hello-pangea/dnd';
 
-const ArgumentEditor = ({ argument, commandId }) => {
+const ArgumentEditor = ({ argument, commandId, index }) => {
     const { commands, updateCommand } = useCommandStore();
-    const [isExpanded, setIsExpanded] = useState(true);
     const [localName, setLocalName] = useState(argument.name);
     const [localValue, setLocalValue] = useState(argument.value);
     const [history, setHistory] = useState([]);
 
-    // This is the function that was missing from the parent.
-    // It's now defined locally and uses the updateCommand from the store.
     const handleUpdateArgument = (updates) => {
-        // We need to find the full command from the store to update it
         const command = commands.find(c => c.id === commandId);
         if (!command) return;
 
@@ -39,9 +35,9 @@ const ArgumentEditor = ({ argument, commandId }) => {
 
     useEffect(() => {
         const fetchHistory = async () => {
-            if (argument.type === 'previous-values' && localName) {
+            if (!argument.isFromOutput && localName) {
                 try {
-                    const response = await fetch(`${API_URL}/commands/${commandId}/arguments/${encodeURIComponent(localName)}/history`);
+                    const response = await fetch(`/api/commands/${commandId}/arguments/${encodeURIComponent(localName)}/history`);
                     const data = await response.json();
                     setHistory(data);
                 } catch (error) {
@@ -50,98 +46,80 @@ const ArgumentEditor = ({ argument, commandId }) => {
             }
         };
         fetchHistory();
-    }, [argument.type, commandId, localName]);
-
-    const handleNameChange = (e) => {
-        setLocalName(e.target.value);
-    };
-
-    const handleValueChange = (e) => {
-        setLocalValue(e.target.value);
-    };
+    }, [argument.isFromOutput, commandId, localName]);
 
     const handleBlur = (field, value) => {
         handleUpdateArgument({ [field]: value });
     };
 
-    const handleTypeChange = (e) => {
-        const newType = e.target.value;
-        const updates = { type: newType };
-        if (newType === 'variable') {
-            updates.value = ''; // Reset value when switching to variable
-        }
-        handleUpdateArgument(updates);
-    };
-
-    const renderValueInput = () => {
-        switch (argument.type) {
-            case 'previous-values':
-                return (
-                    <>
-                        <input
-                            type="text"
-                            value={localValue}
-                            onChange={handleValueChange}
-                            onBlur={() => handleBlur('value', localValue)}
-                            placeholder="Select or type a value"
-                            list={`history-for-${argument.id}`}
-                            className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                        <datalist id={`history-for-${argument.id}`}>
-                            {history.map((val, i) => <option key={i} value={val} />)}
-                        </datalist>
-                    </>
-                );
-            case 'variable':
-                return <p className="text-indigo-400 italic text-sm mt-1">Value from command output.</p>;
-            case 'editable':
-            default:
-                return (
-                    <input
-                        type="text"
-                        value={localValue}
-                        onChange={handleValueChange}
-                        onBlur={() => handleBlur('value', localValue)}
-                        placeholder="Argument value"
-                        className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                );
-        }
-    };
-
     return (
         <div className={`p-3 rounded-lg mb-2 transition-all ${argument.enabled ? 'bg-gray-800' : 'bg-gray-800/50'}`}>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 flex-grow">
                     <input
-                        type="text"
-                        value={localName}
-                        onChange={handleNameChange}
-                        onBlur={() => handleBlur('name', localName)}
-                        placeholder={argument.isPositional ? "Descriptive Label" : "--argument-name"}
-                        className="font-mono text-sm bg-transparent focus:bg-gray-700 rounded px-1 py-0.5 w-1/3"
+                        type="checkbox"
+                        checked={argument.enabled}
+                        onChange={(e) => handleUpdateArgument({ enabled: e.target.checked })}
+                        className="form-checkbox h-4 w-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                        title="Enable/Disable Argument"
                     />
-                    {!argument.isPositional && (
-                        <input
-                            type="text"
-                            value={argument.joiner === undefined ? ' ' : argument.joiner}
-                            onChange={(e) => handleUpdateArgument({ joiner: e.target.value })}
-                            className="font-mono text-sm bg-gray-700 rounded px-1 py-0.5 w-8 text-center"
-                            title="Joiner character"
-                        />
+                    
+                    {!argument.isFromOutput ? (
+                        <>
+                            <input
+                                type="text"
+                                value={localName}
+                                onChange={(e) => setLocalName(e.target.value)}
+                                onBlur={() => handleBlur('name', localName)}
+                                placeholder={argument.isPositional ? "Label" : "--arg-name"}
+                                className="font-mono text-sm bg-gray-700 rounded px-2 py-1 w-1/3"
+                            />
+                            {!argument.isPositional && (
+                                <input
+                                    type="text"
+                                    value={argument.joiner === undefined ? ' ' : argument.joiner}
+                                    onChange={(e) => handleUpdateArgument({ joiner: e.target.value })}
+                                    className="font-mono text-sm bg-gray-700 rounded px-1 py-0.5 w-8 text-center"
+                                    title="Joiner character"
+                                />
+                            )}
+                            <input
+                                type="text"
+                                value={localValue}
+                                onChange={(e) => setLocalValue(e.target.value)}
+                                onBlur={() => handleBlur('value', localValue)}
+                                placeholder="Argument value"
+                                list={`history-for-${argument.id}`}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                            <datalist id={`history-for-${argument.id}`}>
+                                {history.map((val, i) => <option key={i} value={val} />)}
+                            </datalist>
+                        </>
+                    ) : (
+                        <>
+                            <select
+                                value={argument.sourceCommandId || ''}
+                                onChange={(e) => handleUpdateArgument({ sourceCommandId: e.target.value })}
+                                className="w-1/3 bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            >
+                                <option value="">Select Source Command...</option>
+                                {commands
+                                    .filter(c => c.id !== commandId)
+                                    .map(cmd => <option key={cmd.id} value={cmd.id}>{cmd.name}</option>)}
+                            </select>
+                            <input
+                                type="text"
+                                placeholder="Regex to Extract Value"
+                                value={argument.regex}
+                                onChange={(e) => handleUpdateArgument({ regex: e.target.value })}
+                                className="w-full font-mono bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                        </>
                     )}
                 </div>
                 <div className="flex items-center gap-4">
-                    <label className="text-xs flex items-center gap-1 text-gray-400">
-                        <input
-                            type="checkbox"
-                            checked={argument.enabled}
-                            onChange={(e) => handleUpdateArgument({ enabled: e.target.checked })}
-                            className="form-checkbox h-4 w-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
-                        />
-                        Active
-                    </label>
-                    <label className="text-xs flex items-center gap-1 text-gray-400">
+                    <label className="text-xs flex items-center gap-1 text-gray-400" title="Is this a positional argument?">
                         <input
                             type="checkbox"
                             checked={argument.isPositional || false}
@@ -150,74 +128,20 @@ const ArgumentEditor = ({ argument, commandId }) => {
                         />
                         Positional
                     </label>
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="text-gray-400 hover:text-white">
-                        {isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    </button>
+                    <label className="text-xs flex items-center gap-1 text-gray-400" title="Get value from the output of another command">
+                        <input
+                            type="checkbox"
+                            checked={argument.isFromOutput || false}
+                            onChange={(e) => handleUpdateArgument({ isFromOutput: e.target.checked })}
+                            className="form-checkbox h-4 w-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
+                        />
+                        From Output
+                    </label>
                     <button onClick={handleDeleteArgument} className="text-red-500 hover:text-red-400">
                         <TrashIcon />
                     </button>
                 </div>
             </div>
-
-            {isExpanded && (
-                <div className="mt-3 pl-6 border-l-2 border-gray-700">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-xs font-semibold text-gray-400">Value</label>
-                            {renderValueInput()}
-                        </div>
-                        <div>
-                            <label className="text-xs font-semibold text-gray-400">Argument Type</label>
-                            <select
-                                value={argument.type}
-                                onChange={handleTypeChange}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                            >
-                                <option value="editable">Editable Text</option>
-                                <option value="previous-values">Previous Values</option>
-                                <option value="variable">From Command Output</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {argument.type === 'variable' && (
-                        <div className="mt-3 p-3 bg-gray-900/50 rounded-lg border border-indigo-500/30">
-                            <div className="flex items-center gap-2 text-indigo-400 mb-2">
-                                <LinkIcon />
-                                <h4 className="font-semibold text-sm">Link to Command Output</h4>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-400">Source Command</label>
-                                    <select
-                                        value={argument.sourceCommandId || ''}
-                                        onChange={(e) => handleUpdateArgument({ sourceCommandId: e.target.value })}
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                    >
-                                        <option value="">Select a command...</option>
-                                        {commands
-                                            .filter(c => c.id !== commandId) // Prevent self-dependency
-                                            .map(cmd => <option key={cmd.id} value={cmd.id}>{cmd.name}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-400">Regex to Extract Value</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g., token: (\w+)"
-                                        value={argument.regex}
-                                        onChange={(e) => handleUpdateArgument({ regex: e.target.value })}
-                                        className="w-full font-mono bg-gray-700 border border-gray-600 rounded-md px-2 py-1 mt-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                    />
-                                </div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                                The value for this argument will be the first capture group from the regex match on the source command's output.
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 };

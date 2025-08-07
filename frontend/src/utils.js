@@ -2,11 +2,11 @@ export const createNewArgument = () => ({
     id: `arg-${Date.now()}-${Math.random()}`,
     name: '--new-arg',
     value: '',
-    type: 'editable', // 'editable', 'fixed', 'previous-values', 'variable'
     isPositional: false,
+    isFromOutput: false,
     joiner: ' ',
-    sourceCommandId: null, // For variable type
-    regex: '', // For variable type
+    sourceCommandId: null,
+    regex: '',
     enabled: true,
 });
 
@@ -16,6 +16,7 @@ export const createNewCommand = () => ({
     executable: '',
     workingDirectory: '',
     arguments: [],
+    dependsOn: [],
     status: 'idle', // idle, running, success, error, stopped
     output: [],
     errorOutput: [],

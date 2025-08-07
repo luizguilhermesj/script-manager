@@ -121,7 +121,31 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
             return res.status(400).json({ 'error': 'Command is already running' });
         }
 
-        const executable = commandDef.executable || '';
+        const allDeps = [...new Set([...(commandDef.dependsOn || []), ...commandDef.arguments
+            .filter(arg => arg.enabled && arg.isFromOutput && arg.sourceCommandId)
+            .map(arg => arg.sourceCommandId)])];
+
+        for (const depId of allDeps) {
+            const depRow = await getDb("SELECT data FROM commands WHERE id = ?", [depId]);
+            if (!depRow) {
+                throw new Error(`Dependency with ID '${depId}' not found.`);
+            }
+            const depDef = JSON.parse(depRow.data);
+            if (depDef.status !== 'success') {
+                throw new Error(`Dependency '${depDef.name}' has not run successfully.`);
+            }
+        }
+
+        const variables = await getAllDb("SELECT name, value FROM variables", []);
+        const substituteVariables = (str) => {
+            let result = str;
+            for (const variable of variables) {
+                result = result.replace(new RegExp(`{{${variable.name}}}`, 'g'), variable.value);
+            }
+            return result;
+        };
+
+        const executable = substituteVariables(commandDef.executable || '');
         const generatedArgs = [];
         const arguments = commandDef.arguments || [];
 
@@ -129,10 +153,10 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
             if (!arg.enabled) continue;
 
             console.log('ARG', arg);
-            let final_value = arg.value || '';
-            const arg_name = arg.name || '';
+            let final_value = substituteVariables(arg.value || '');
+            const arg_name = substituteVariables(arg.name || '');
 
-            if (arg.type === 'variable') {
+            if (arg.isFromOutput) {
                 if (!arg.sourceCommandId) {
                     throw new Error(`Argument '${arg_name}' is missing a source command.`);
                 }
@@ -155,28 +179,28 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
                 const full_output = (sourceCommandDef.output || []).join('\n');
                 
                 try {
-                    const match = full_output.match(new RegExp(arg.regex));
+                    const match = full_output.match(new RegExp(substituteVariables(arg.regex)));
                     if (match) {
                         final_value = match[1] ? match[1] : match[0];
                     } else {
                         throw new Error(`Regex did not find a match in the output of '${sourceCommandName}'.`);
-                    } 
+                    }
                 } catch (e) {
                     throw new Error(`Invalid regex for argument '${arg_name}': ${e.message}`);
                 }
             }
 
-            if (arg.type !== 'variable' && final_value) {
+            if (!arg.isFromOutput && final_value) {
                 await runDb('INSERT OR IGNORE INTO argument_history (command_id, argument_name, value) VALUES (?, ?, ?)', [command_id, arg_name, final_value]);
             }
 
             console.log('final', final_value)
             if (arg.isPositional) {
-                if (final_value) generatedArgs.push(`'${final_value}'`);
+                if (final_value) generatedArgs.push(final_value);
             } else {
                 const joiner = arg.joiner === undefined ? ' ' : arg.joiner;
                 if (final_value) {
-                    generatedArgs.push(`${arg_name}${joiner}'${final_value}'`);
+                    generatedArgs.push(`${arg_name}${joiner}${final_value}`);
                 } else {
                     generatedArgs.push(arg_name);
                 }
@@ -198,7 +222,7 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
             shell: true, 
             stdio: ['pipe', 'pipe', 'pipe'], 
             detached: true,
-            cwd: commandDef.workingDirectory || os.homedir()
+            cwd: substituteVariables(commandDef.workingDirectory || os.homedir())
         });
         processes[command_id] = proc;
 
@@ -236,6 +260,15 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
     } catch (error) {
         await updateCommandError(error.message);
         return res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/api/working_directory/history', async (req, res) => {
+    try {
+        const rows = await getAllDb("SELECT DISTINCT path FROM working_directory_history ORDER BY id DESC LIMIT 10", []);
+        res.json(rows.map(r => r.path));
+    } catch (err) {
+        res.status(500).json({ "error": err.message });
     }
 });
 
@@ -306,6 +339,3 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
 });
 
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});

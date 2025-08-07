@@ -6,6 +6,7 @@ import { createNewCommand } from './utils';
 
 const useCommandStore = create((set, get) => ({
     commands: [],
+    variables: [],
     loading: true,
     isInitialized: false,
 
@@ -22,9 +23,23 @@ const useCommandStore = create((set, get) => ({
         });
     }, 500),
 
-    fetchInitialCommands: async () => {
+    fetchInitialData: async () => {
         try {
-            const initialCommands = await getCommands();
+            const results = await Promise.allSettled([
+                getCommands(),
+                fetch('/api/variables').then(res => res.json())
+            ]);
+
+            const initialCommands = results[0].status === 'fulfilled' ? results[0].value : [];
+            const initialVariables = results[1].status === 'fulfilled' ? results[1].value : [];
+
+            if (results[0].status === 'rejected') {
+                toast.error("Failed to fetch commands.");
+            }
+            if (results[1].status === 'rejected') {
+                toast.error("Failed to fetch variables.");
+            }
+
             set({
                 commands: initialCommands.map(cmd => ({
                     ...cmd,
@@ -32,10 +47,11 @@ const useCommandStore = create((set, get) => ({
                     errorOutput: cmd.errorOutput || [],
                     savingStatus: 'success',
                 })),
+                variables: initialVariables,
                 loading: false
             });
         } catch (error) {
-            toast.error("Failed to fetch commands.");
+            toast.error("Failed to fetch initial data.");
             set({ loading: false });
         }
     },
@@ -65,21 +81,13 @@ const useCommandStore = create((set, get) => ({
         }
     },
 
-    runCommand: async (commandId) => {
-        try {
-            await apiRunCommand(commandId);
-        } catch (error) {
-            toast.error(`Failed to run command: ${error.message}`);
-        }
-    },
-
-    stopCommand: async (commandId) => {
-        try {
-            await apiStopCommand(commandId);
-            toast.success('Stop signal sent.');
-        } catch (error) {
-            toast.error(`Failed to stop command: ${error.message}`);
-        }
+    reorderCommands: (startIndex, endIndex) => {
+        set(state => {
+            const result = Array.from(state.commands);
+            const [removed] = result.splice(startIndex, 1);
+            result.splice(endIndex, 0, removed);
+            return { commands: result };
+        });
     },
 
     runChain: async (commandId) => {
@@ -92,9 +100,11 @@ const useCommandStore = create((set, get) => ({
             visited.add(cmdId);
             const command = commandMap.get(cmdId);
             if (command) {
-                command.arguments
-                    .filter(arg => arg.enabled && arg.type === 'variable' && arg.sourceCommandId)
-                    .forEach(arg => getDependencies(arg.sourceCommandId));
+                const allDeps = [...new Set([...(command.dependsOn || []), ...command.arguments
+                    .filter(arg => arg.enabled && arg.isFromOutput && arg.sourceCommandId)
+                    .map(arg => arg.sourceCommandId)])];
+                
+                allDeps.forEach(depId => getDependencies(depId));
                 chain.push(command);
             }
         }
@@ -126,6 +136,53 @@ const useCommandStore = create((set, get) => ({
                 toast.error(error.message);
                 return;
             }
+        }
+    },
+
+    // --- Variable Actions ---
+    addVariable: async (name, value) => {
+        const id = `var-${Date.now()}`;
+        try {
+            await fetch('/api/variables', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, name, value }),
+            });
+            set(state => ({ variables: [...state.variables, { id, name, value }] }));
+        } catch (error) {
+            toast.error('Failed to add variable.');
+        }
+    },
+
+    updateVariable: async (id, updates) => {
+        const originalVariables = get().variables;
+        const variableToUpdate = originalVariables.find(v => v.id === id);
+        const updatedVariable = { ...variableToUpdate, ...updates };
+
+        set(state => ({
+            variables: state.variables.map(v => v.id === id ? updatedVariable : v)
+        }));
+
+        try {
+            await fetch(`/api/variables/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedVariable),
+            });
+        } catch (error) {
+            toast.error('Failed to update variable.');
+            set({ variables: originalVariables });
+        }
+    },
+
+    deleteVariable: async (id) => {
+        const originalVariables = get().variables;
+        set(state => ({ variables: state.variables.filter(v => v.id !== id) }));
+        try {
+            await fetch(`/api/variables/${id}`, { method: 'DELETE' });
+        } catch (error) {
+            toast.error('Failed to delete variable.');
+            set({ variables: originalVariables });
         }
     },
 
@@ -196,6 +253,6 @@ const useCommandStore = create((set, get) => ({
 
 // Initialize after creation
 useCommandStore.getState().initSocketListeners();
-useCommandStore.getState().fetchInitialCommands();
+useCommandStore.getState().fetchInitialData();
 
 export default useCommandStore;
