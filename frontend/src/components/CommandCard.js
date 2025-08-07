@@ -125,7 +125,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                     } else {
                         try {
                             const regex = new RegExp(substituteVariables(arg.regex, variables));
-                            const fullOutput = sourceCommand.output.join('\n');
+                            const fullOutput = sourceCommand.output.map(line => line.content).join('\n');
                             const match = fullOutput.match(regex);
                             value = (match && match[1]) ? match[1] : '<no match>';
                         } catch (e) {

@@ -289,13 +289,13 @@ app.post('/api/commands/:command_id/run', async (req, res) => {
         proc.stdout.on('data', (data) => {
             const output = data.toString().trim();
             stdout_lines.push(output);
-            io.emit('stdout', { command_id, output });
+            io.emit('output', { command_id, type: 'stdout', content: output });
         });
 
         proc.stderr.on('data', (data) => {
             const output = data.toString().trim();
             stderr_lines.push(output);
-            io.emit('stderr', { command_id, output });
+            io.emit('output', { command_id, type: 'stderr', content: output });
         });
 
         proc.on('close', async (code, signal) => {
