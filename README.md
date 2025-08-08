@@ -14,28 +14,46 @@ A web-based interface for managing and running command-line scripts and workflow
 
 ## Tech Stack
 
-- **Frontend:** React with Zustand for state management.
-- **Backend:** Node.js with Express and Socket.IO.
-- **Database:** SQLite.
+- **Framework:** Next.js (React)
+- **State Management:** Zustand
+- **Real-time:** Socket.IO
+- **Database:** SQLite
 
 ## How to Run
+
+### Development
+
+To run the application in development mode with hot-reloading:
 
 1.  **Install Dependencies:**
     ```bash
     npm install
-    cd frontend
+    ```
+
+2.  **Start the Development Server:**
+    ```bash
+    npm run dev
+    ```
+
+The application will be available at `http://localhost:3000`.
+
+### Production
+
+To build and run the application in production mode:
+
+1.  **Install Dependencies:**
+    ```bash
     npm install
     ```
 
-2.  **Build the Frontend:**
+2.  **Build the Application:**
     ```bash
     npm run build
     ```
 
-3.  **Start the Server:**
+3.  **Start the Production Server:**
     ```bash
-    cd ..
     npm start
     ```
 
-The application will be available at `http://localhost:4000`.
+The application will be available at `http://localhost:3000`.
