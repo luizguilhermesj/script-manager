@@ -125,9 +125,15 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                     } else {
                         try {
                             const regex = new RegExp(substituteVariables(arg.regex, variables));
-                            const fullOutput = sourceCommand.output.map(line => line.content).join('\n');
+                            const fullOutput = sourceCommand.output.map(line => {
+                                // Handle both string and object formats
+                                return typeof line === 'string' ? line : (line.content || '');
+                            }).join('\n');
+                            console.log('UI Regex match - Output:', fullOutput);
+                            console.log('UI Regex match - Pattern:', regex);
                             const match = fullOutput.match(regex);
-                            value = (match && match[1]) ? match[1] : '<no match>';
+                            console.log('UI Regex match - Result:', match);
+                            value = match ? (match[1] || match[0]) : '<no match>';
                         } catch (e) {
                             value = '<invalid regex>';
                         }

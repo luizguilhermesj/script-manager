@@ -144,14 +144,7 @@ export default async function handler(req, res) {
                 }
             }
 
-            // For ping commands, add a timeout to ensure graceful termination
-            let commandToRun = `${executable} ${generatedArgs.join(' ')}`;
-            if (executable.includes('ping') && !generatedArgs.some(arg => arg.includes('-c') || arg.includes('-w'))) {
-                // Add a timeout of 30 seconds to ping commands for graceful termination
-                commandToRun = `${executable} -w 30 ${generatedArgs.join(' ')}`;
-                console.log(`[${command_id}] Modified ping command with timeout:`, commandToRun);
-            }
-
+            const commandToRun = `${executable} ${generatedArgs.join(' ')}`;
             commandDef.generatedCommand = commandToRun;
             commandDef.status = 'running';
             commandDef.output = [`$ ${commandToRun}`];
