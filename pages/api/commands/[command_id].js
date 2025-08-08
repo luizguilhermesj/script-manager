@@ -43,12 +43,13 @@ export default async function handler(req, res) {
           const commandDef = JSON.parse(row.data);
           commandDef.status = 'stopped';
           await db.run(`UPDATE commands SET data = ? WHERE id = ?`, [JSON.stringify(commandDef), command_id]);
-          io.emit('status_update', commandDef);
+          // Don't send output in status update to preserve accumulated output
+          const { output, errorOutput, ...statusUpdate } = commandDef;
+          io.emit('status_update', statusUpdate);
 
-          // Also force the process to be removed from tracking
-          if (processes[command_id]) {
-            delete processes[command_id];
-          }
+          // Don't immediately remove the process - let it finish naturally
+          // The process will be cleaned up when the 'close' event fires
+          console.log('Process kill signal sent, waiting for natural termination');
         }
 
         res.status(200).json({ message: 'Stop signal sent' });
@@ -64,7 +65,9 @@ export default async function handler(req, res) {
         const commandDef = JSON.parse(row.data);
         commandDef.status = 'stopped';
         await db.run(`UPDATE commands SET data = ? WHERE id = ?`, [JSON.stringify(commandDef), command_id]);
-        io.emit('status_update', commandDef);
+        // Don't send output in status update to preserve accumulated output
+        const { output, errorOutput, ...statusUpdate } = commandDef;
+        io.emit('status_update', statusUpdate);
       }
       res.status(200).json({ message: 'Command already stopped' });
     } else {

@@ -35,7 +35,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
         setLocalCommand(newCommand);
         debouncedUpdate(newCommand);
     };
-    
+
     useEffect(() => {
         const fetchHistory = async () => {
             try {
@@ -58,7 +58,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
         newArgs.splice(result.destination.index, 0, removed);
         handleChange({ arguments: newArgs });
     };
-    
+
     const implicitDependencies = useMemo(() => {
         return localCommand.arguments
             .filter(arg => arg.enabled && arg.isFromOutput && arg.sourceCommandId)
@@ -94,7 +94,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
             }
             return descendants;
         };
-        
+
         const commandsThatDependOnThis = new Set();
         for (const c of commands) {
             if (getDescendants(c.id, commands).has(command.id)) {
@@ -102,8 +102,8 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
             }
         }
 
-        return commands.filter(c => 
-            c.id !== localCommand.id && 
+        return commands.filter(c =>
+            c.id !== localCommand.id &&
             !dependenciesOfThisCommand.has(c.id) &&
             !commandsThatDependOnThis.has(c.id)
         );
@@ -398,12 +398,12 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                                                             argument={arg}
                                                             commandId={command.id}
                                                             onUpdate={(updates) => {
-                                                                const newArgs = localCommand.arguments.map(a => a.id === arg.id ? {...a, ...updates} : a);
-                                                                handleChange({arguments: newArgs});
+                                                                const newArgs = localCommand.arguments.map(a => a.id === arg.id ? { ...a, ...updates } : a);
+                                                                handleChange({ arguments: newArgs });
                                                             }}
                                                             onDelete={() => {
                                                                 const newArgs = localCommand.arguments.filter(a => a.id !== arg.id);
-                                                                handleChange({arguments: newArgs});
+                                                                handleChange({ arguments: newArgs });
                                                             }}
                                                         />
                                                     </div>
@@ -448,7 +448,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                                         >
                                             Clear
                                         </button>
-                                    }
+                                    </div>
                                 </div>
 
                                 <div className="border-b border-gray-600 mb-2">
