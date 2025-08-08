@@ -87,17 +87,44 @@ export default async function handler(req, res) {
                         throw new Error(`Argument '${arg_name}' is missing a regex pattern.`);
                     }
 
-                    const full_output = (sourceCommandDef.output || []).slice(1).map(line => line.content).join('\n');
+                    // Get all output lines
+                    let outputLines = sourceCommandDef.output || [];
+                    console.log(`[Debug] Raw output lines:`, outputLines);
+
+                    // Map to content and join with newlines
+                    const full_output = outputLines.map(line => {
+                        if (typeof line === 'string') return line;
+                        return line.content || '';
+                    }).join('\n');
+
+                    console.log(`[Debug] Command '${sourceCommandName}':`);
+                    console.log(`[Debug] Output type:`, typeof full_output);
+                    console.log(`[Debug] Output length:`, full_output.length);
+                    console.log(`[Debug] Raw output:\n'${full_output}'`);
+                    console.log(`[Debug] Regex pattern: '${substituteVariables(arg.regex)}'`);
 
                     try {
-                        const match = full_output.match(new RegExp(substituteVariables(arg.regex)));
+                        const regex = new RegExp(substituteVariables(arg.regex));
+                        console.log(`[Debug] Using regex:`, regex);
+                        
+                        const match = full_output.match(regex);
+                        console.log(`[Debug] Match result:`, match);
+
                         if (match) {
-                            final_value = match[1] ? match[1] : match[0];
+                            // Log all capturing groups
+                            console.log(`[Debug] All matches:`, match.map((m, i) => `Group ${i}: '${m}'`));
+                            
+                            final_value = match[1] || match[0];
+                            if (!final_value && final_value !== '') {
+                                throw new Error(`Regex matched but captured nothing.\nPattern: ${regex}\nOutput: '${full_output}'`);
+                            }
+                            console.log(`[Debug] Final value: '${final_value}'`);
                         } else {
-                            throw new Error(`Regex did not find a match in the output of '${sourceCommandName}'.`);
+                            throw new Error(`No match found.\nPattern: ${regex}\nOutput: '${full_output}'`);
                         }
                     } catch (e) {
-                        throw new Error(`Invalid regex for argument '${arg_name}': ${e.message}`);
+                        console.error(`[Debug] Regex error:`, e);
+                        throw new Error(`Regex error for '${arg_name}': ${e.message}\nPattern: ${arg.regex}\nOutput: '${full_output}'`);
                     }
                 }
 

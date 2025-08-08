@@ -6,7 +6,8 @@ const ArgumentEditor = ({ argument, commandId }) => {
     const { commands, updateCommand } = useCommandStore();
     const [localName, setLocalName] = useState(argument.name);
     const [localValue, setLocalValue] = useState(argument.value);
-    const [history, setHistory] = useState([]);
+    const [historyValues, setHistoryValues] = useState([]);
+    const [regexError, setRegexError] = useState(null);
 
     const handleUpdateArgument = (updates) => {
         const command = commands.find(c => c.id === commandId);
@@ -31,20 +32,35 @@ const ArgumentEditor = ({ argument, commandId }) => {
         setLocalValue(argument.value);
     }, [argument.name, argument.value]);
 
-    useEffect(() => {
-        const fetchHistory = async () => {
-            if (!argument.isFromOutput && localName) {
-                try {
-                    const response = await fetch(`/api/commands/${commandId}/arguments/${encodeURIComponent(localName)}/history`);
-                    const data = await response.json();
-                    setHistory(data);
-                } catch (error) {
-                    console.error('Error fetching argument history:', error);
+    const fetchHistory = async () => {
+        if (!argument.isFromOutput && argument.id) {
+            try {
+                const response = await fetch(`/api/commands/${commandId}/arguments/${encodeURIComponent(argument.id)}/history`);
+                const data = await response.json();
+                // Ensure history is always an array
+                setHistoryValues(Array.isArray(data) ? data : []);
+                if (!Array.isArray(data)) {
+                    console.error('History data is not an array:', data);
                 }
+            } catch (error) {
+                console.error('Error fetching argument history:', error);
+                setHistoryValues([]); // Reset to empty array on error
             }
-        };
-        fetchHistory();
-    }, [argument.isFromOutput, commandId, localName]);
+        }
+    };        // Listen for regex errors from backend via status_update or output events (Socket.IO)
+        useEffect(() => {
+            const handleStatusUpdate = (data) => {
+                if (data && data.error && data.error.includes('Regex')) {
+                    setRegexError(data.error);
+                } else {
+                    setRegexError(null);
+                }
+            };
+            if (window && window.socket) {
+                window.socket.on('status_update', handleStatusUpdate);
+                return () => window.socket.off('status_update', handleStatusUpdate);
+            }
+        }, []);
 
     const handleBlur = (field, value) => {
         handleUpdateArgument({ [field]: value });
@@ -52,6 +68,9 @@ const ArgumentEditor = ({ argument, commandId }) => {
 
     return (
         <div className={`p-3 rounded-lg mb-2 transition-all ${argument.enabled ? 'bg-gray-800' : 'bg-gray-800/50'}`}>
+            {regexError && (
+                <div className="text-red-400 text-xs mb-2">Regex Error: {regexError}</div>
+            )}
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 flex-grow">
                     <input
@@ -81,17 +100,18 @@ const ArgumentEditor = ({ argument, commandId }) => {
                                     title="Joiner character"
                                 />
                             )}
-                            <input
-                                type="text"
-                                value={localValue}
-                                onChange={(e) => setLocalValue(e.target.value)}
-                                onBlur={() => handleBlur('value', localValue)}
-                                placeholder="Argument value"
-                                list={`history-for-${argument.id}`}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                            />
+                                <input
+                                    type="text"
+                                    value={localValue}
+                                    onChange={(e) => setLocalValue(e.target.value)}
+                                    onBlur={() => handleBlur('value', localValue)}
+                                    onFocus={fetchHistory}
+                                    placeholder="Argument value"
+                                    list={`history-for-${argument.id}`}
+                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                />
                             <datalist id={`history-for-${argument.id}`}>
-                                {history.map((val, i) => <option key={i} value={val} />)}
+                                {historyValues.map((val, i) => <option key={i} value={val} />)}
                             </datalist>
                         </>
                     ) : (

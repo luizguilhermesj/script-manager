@@ -6,10 +6,11 @@ CREATE TABLE IF NOT EXISTS commands (
 CREATE TABLE IF NOT EXISTS argument_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   command_id TEXT NOT NULL,
+  argument_id TEXT NOT NULL,
   argument_name TEXT NOT NULL,
   value TEXT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(command_id, argument_name, value)
+  UNIQUE(command_id, argument_id, value)
 );
 
 CREATE TABLE IF NOT EXISTS working_directory_history (
