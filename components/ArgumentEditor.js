@@ -80,36 +80,43 @@ const ArgumentEditor = ({ argument, commandId }) => {
                         className="form-checkbox h-4 w-4 text-indigo-600 bg-gray-700 border-gray-600 rounded focus:ring-indigo-500"
                         title="Enable/Disable Argument"
                     />
-                    
+
+                    {/* Label (name) - hidden when positional */}
+                    {!argument.isPositional && (
+                        <input
+                            type="text"
+                            value={localName}
+                            onChange={(e) => setLocalName(e.target.value)}
+                            onBlur={() => handleBlur('name', localName)}
+                            placeholder="--arg-name"
+                            className="font-mono text-sm bg-gray-700 rounded px-2 py-1 w-1/3"
+                        />
+                    )}
+
+                    {/* Joiner - hidden when positional */}
+                    {!argument.isPositional && (
+                        <input
+                            type="text"
+                            value={argument.joiner === undefined ? ' ' : argument.joiner}
+                            onChange={(e) => handleUpdateArgument({ joiner: e.target.value })}
+                            className="font-mono text-sm bg-gray-700 rounded px-1 py-0.5 w-8 text-center"
+                            title="Joiner character"
+                        />
+                    )}
+
+                    {/* Value area: either plain value or From Output controls */}
                     {!argument.isFromOutput ? (
                         <>
                             <input
                                 type="text"
-                                value={localName}
-                                onChange={(e) => setLocalName(e.target.value)}
-                                onBlur={() => handleBlur('name', localName)}
-                                placeholder={argument.isPositional ? "Label" : "--arg-name"}
-                                className="font-mono text-sm bg-gray-700 rounded px-2 py-1 w-1/3"
+                                value={localValue}
+                                onChange={(e) => setLocalValue(e.target.value)}
+                                onBlur={() => handleBlur('value', localValue)}
+                                onFocus={fetchHistory}
+                                placeholder="Argument value"
+                                list={`history-for-${argument.id}`}
+                                className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
                             />
-                            {!argument.isPositional && (
-                                <input
-                                    type="text"
-                                    value={argument.joiner === undefined ? ' ' : argument.joiner}
-                                    onChange={(e) => handleUpdateArgument({ joiner: e.target.value })}
-                                    className="font-mono text-sm bg-gray-700 rounded px-1 py-0.5 w-8 text-center"
-                                    title="Joiner character"
-                                />
-                            )}
-                                <input
-                                    type="text"
-                                    value={localValue}
-                                    onChange={(e) => setLocalValue(e.target.value)}
-                                    onBlur={() => handleBlur('value', localValue)}
-                                    onFocus={fetchHistory}
-                                    placeholder="Argument value"
-                                    list={`history-for-${argument.id}`}
-                                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                />
                             <datalist id={`history-for-${argument.id}`}>
                                 {historyValues.map((val, i) => <option key={i} value={val} />)}
                             </datalist>
