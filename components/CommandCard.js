@@ -17,7 +17,7 @@ const substituteVariables = (str, variables) => {
 
 const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain }) => {
     const { commands, variables, updateCommand } = useCommandStore();
-    const [isOutputVisible, setIsOutputVisible] = useState(true);
+    const [isOutputVisible, setIsOutputVisible] = useState(command.uiOutputVisible ?? true);
     const [workingDirHistory, setWorkingDirHistory] = useState([]);
     const [localCommand, setLocalCommand] = useState(command);
 
@@ -217,7 +217,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
         }
     }, [command.errorOutput]);
 
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(command.uiCollapsed || false);
 
     const handleDelete = () => {
         if (window.confirm(`Are you sure you want to delete the command "${command.name}"?`)) {
@@ -257,7 +257,11 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
         <div className={`bg-gray-800/50 border-l-4 ${statusStyles[command.status]} rounded-lg shadow-lg mb-6`}>
             <div className="p-4 border-b border-gray-700/50 flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-4 flex-grow">
-                    <button onClick={() => setIsCollapsed(!isCollapsed)} className="text-gray-400 hover:text-white">
+                    <button onClick={() => {
+                        const newValue = !isCollapsed;
+                        setIsCollapsed(newValue);
+                        updateCommand(command.id, { uiCollapsed: newValue });
+                    }} className="text-gray-400 hover:text-white">
                         {isCollapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
                     </button>
                     <div className={`w-3 h-3 rounded-full ${statusColor[command.status].replace('text-', 'bg-')}`}></div>
@@ -431,7 +435,11 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                     </div>
 
                     <div className="border-t border-gray-700/50">
-                        <button onClick={() => setIsOutputVisible(!isOutputVisible)} className="w-full p-3 text-left flex justify-between items-center bg-gray-800 hover:bg-gray-700/50 transition-colors">
+                        <button onClick={() => {
+                            const newVal = !isOutputVisible;
+                            setIsOutputVisible(newVal);
+                            updateCommand(command.id, { uiOutputVisible: newVal });
+                        }} className="w-full p-3 text-left flex justify_between items-center bg-gray-800 hover:bg-gray-700/50 transition-colors">
                             <span className="font-semibold text-gray-300">Output & Status</span>
                             {isOutputVisible ? <ChevronUpIcon /> : <ChevronDownIcon />}
                         </button>
