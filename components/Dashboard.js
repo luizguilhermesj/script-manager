@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Toaster } from 'react-hot-toast';
 import useCommandStore from '@lib/store';
 import CommandCard from '@components/CommandCard';
 import Variables from '@components/Variables';
@@ -67,9 +66,6 @@ function Dashboard() {
 
     return (
         <div className="bg-gray-900 min-h-screen text-white font-sans">
-            <Toaster position="bottom-right" toastOptions={{
-                className: 'bg-gray-700 text-white',
-            }} />
             <div className="container mx-auto p-4 md:p-8">
                 <header className="mb-8">
                     <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl md:text-6xl">

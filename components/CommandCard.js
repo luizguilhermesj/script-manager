@@ -439,7 +439,7 @@ const CommandCard = ({ command, runCommand, stopCommand, deleteCommand, runChain
                             const newVal = !isOutputVisible;
                             setIsOutputVisible(newVal);
                             updateCommand(command.id, { uiOutputVisible: newVal });
-                        }} className="w-full p-3 text-left flex justify_between items-center bg-gray-800 hover:bg-gray-700/50 transition-colors">
+                        }} className="w-full p-3 text-left flex justify-between items-center bg-gray-800 hover:bg-gray-700/50 transition-colors">
                             <span className="font-semibold text-gray-300">Output & Status</span>
                             {isOutputVisible ? <ChevronUpIcon /> : <ChevronDownIcon />}
                         </button>

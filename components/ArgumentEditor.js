@@ -48,19 +48,19 @@ const ArgumentEditor = ({ argument, commandId }) => {
             }
         }
     };        // Listen for regex errors from backend via status_update or output events (Socket.IO)
-        useEffect(() => {
-            const handleStatusUpdate = (data) => {
-                if (data && data.error && data.error.includes('Regex')) {
-                    setRegexError(data.error);
-                } else {
-                    setRegexError(null);
-                }
-            };
-            if (window && window.socket) {
-                window.socket.on('status_update', handleStatusUpdate);
-                return () => window.socket.off('status_update', handleStatusUpdate);
+    useEffect(() => {
+        const handleStatusUpdate = (data) => {
+            if (data && data.error && data.error.includes('Regex')) {
+                setRegexError(data.error);
+            } else {
+                setRegexError(null);
             }
-        }, []);
+        };
+        if (window && window.socket) {
+            window.socket.on('status_update', handleStatusUpdate);
+            return () => window.socket.off('status_update', handleStatusUpdate);
+        }
+    }, []);
 
     const handleBlur = (field, value) => {
         handleUpdateArgument({ [field]: value });
