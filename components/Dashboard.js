@@ -40,6 +40,14 @@ function Dashboard() {
                 useCommandStore.getState().handleStatusUpdate(data);
             });
 
+            socket.on('command_added', (data) => {
+                useCommandStore.getState().handleCommandAdded(data);
+            });
+
+            socket.on('command_deleted', (data) => {
+                useCommandStore.getState().handleCommandDeleted(data);
+            });
+
             setSocket(socket);
         }
         socketInitializer();
